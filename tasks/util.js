@@ -22,7 +22,7 @@ function appRoot () {
 }
 
 
-function loadConfig () {
+function loadConfig (args) {
     const app_root = appRoot();
     
     let migrations_path = `${app_root}/migrations`;
@@ -43,10 +43,10 @@ function loadConfig () {
     }
     
     return {
-        app_root,
-        migrations_path,
-        models_path,
-        knex: Knex({
+        app_root: args.app_root || app_root,
+        migrations_path: args.migrations_path || migrations_path,
+        models_path: args.models_path || models_path,
+        knex: args.knex || Knex({
             client: 'pg',
             connection: process.env.DATABASE_URL
         })

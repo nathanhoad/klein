@@ -52,7 +52,7 @@ test('It can load belongs_to and has_many relations', t => {
         }
     ];
     
-    return Helpers.setupDatabase(Helpers.knex, [
+    return Helpers.setupDatabase([
         ['users', 'name:string', 'team_id:uuid'],
         ['teams', 'name:string']
     ]).then(() => {
@@ -82,8 +82,8 @@ test('It can load belongs_to and has_many relations', t => {
         
         t.is(teams.count(), 2);
         
-        t.is(teams.getIn([0, 'users']).count(), 2);
-        t.is(teams.getIn([1, 'users']).count(), 1);
+        t.is(teams.find(t => t.get('name') == new_teams[0].name).get('users').count(), 2);
+        t.is(teams.find(t => t.get('name') == new_teams[1].name).get('users').count(), 1);
         
     });
 });
@@ -141,7 +141,7 @@ test('It can load has_many_through relations', t => {
         { project_id: new_projects[1].id, user_id: new_users[2].id }
     ];
     
-    return Helpers.setupDatabase(Helpers.knex, [
+    return Helpers.setupDatabase([
         ['users', 'name:string'],
         ['projects_users', 'user_id:uuid', 'project_id:uuid'],
         ['projects', 'name:string']
@@ -203,7 +203,7 @@ test('It can save an object that has has_and_belongs_to_many relations on it', t
         name: 'Nathan'
     };
     
-    return Helpers.setupDatabase(Helpers.knex, [
+    return Helpers.setupDatabase([
         ['users', 'name:string'],
         ['projects_users', 'user_id:uuid', 'project_id:uuid'],
         ['projects', 'name:string']
@@ -275,7 +275,7 @@ test('It can save an object that has has_many relations on it', t => {
         name: 'Nathan'
     };
     
-    return Helpers.setupDatabase(Helpers.knex, [
+    return Helpers.setupDatabase([
         ['users', 'name:string'],
         ['projects', 'name:string', 'user_id:uuid']
     ]).then(() => {
@@ -318,6 +318,77 @@ test('It can save an object that has has_many relations on it', t => {
 });
 
 
+test('It can save an object that has has_many relations on it and one of them also has a has_many relation on it', t => {
+    const Users = Klein.model('users', {
+        relations: {
+            projects: { has_many: 'projects' }
+        }
+    });
+    const Projects = Klein.model('projects', {
+        relations: {
+            user: { belongs_to: 'user' },
+            lists: { has_many: 'lists' }
+        }
+    });
+    
+    process.env.APP_ROOT = '/tmp/klein/saving-has-many-has-many';
+    FS.removeSync(process.env.APP_ROOT);
+    
+    const new_user = {
+        name: 'Nathan',
+        projects: [
+            {
+                name: 'Awesome Game'
+            },
+            {
+                name: 'Design',
+                lists: [
+                    {
+                        name: 'To Do'
+                    },
+                    {
+                        name: 'Doing'
+                    },
+                    {
+                        name: 'Done'
+                    }
+                ]
+            }
+        ]
+    };
+    
+    return Helpers.setupDatabase([
+        ['users', 'name:string'],
+        ['projects', 'name:string', 'user_id:uuid'],
+        ['lists', 'name:string', 'project_id:uuid']
+    ]).then(() => {
+        return Users.create(new_user);
+    }).then(user => {
+        let projects = user.get('projects');
+        
+        t.is(projects.count(), 2);
+        
+        let project_with_lists = projects.find(p => p.has('lists'));
+        
+        t.is(project_with_lists.get('lists').count(), 3);
+        t.is(project_with_lists.getIn(['lists', 0, 'name']), new_user.projects[1].lists[0].name);
+        
+        return Projects.include('lists').reload(project_with_lists).then(project => {
+            
+            t.is(project.get('lists').count(), 3);
+            
+            const Lists = Klein.model('lists');
+            const first_list = project.getIn(['lists', 0]);
+            return Lists.find(first_list.get('id')).then(list => {
+                
+                t.is(list.get('id'), first_list.get('id'));
+                
+            });
+        });
+    });
+});
+
+
 test('It can save an object that has a belongs_to relations on it', t => {
     const Users = Klein.model('users', {
         relations: {
@@ -346,7 +417,7 @@ test('It can save an object that has a belongs_to relations on it', t => {
         name: 'Lilly'
     });
     
-    return Helpers.setupDatabase(Helpers.knex, [
+    return Helpers.setupDatabase([
         ['users', 'name:string'],
         ['projects', 'name:string', 'user_id:uuid']
     ]).then(() => {
@@ -405,7 +476,7 @@ test('It can destroy dependent objects when destroying the parent', t => {
     const new_project = Immutable.fromJS({ id: uuid(), name: 'Awesome Game' });
     const new_user = Immutable.fromJS({ name: 'Nathan' });
     
-    return Helpers.setupDatabase(Helpers.knex, [
+    return Helpers.setupDatabase([
         ['users', 'name:string'],
         ['projects', 'name:string', 'user_id:uuid']
     ]).then(() => {

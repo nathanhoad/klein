@@ -33,7 +33,7 @@ test.serial('It can create a new instance', t => {
     process.env.APP_ROOT = '/tmp/klein/new-instance';
     FS.removeSync(process.env.APP_ROOT);
     
-    return Helpers.setupDatabase(Helpers.knex, [
+    return Helpers.setupDatabase([
         ['list', 'name:string', 'tasks:jsonb']
     ]).then(() => {
         const Lists = Klein.model('lists');
@@ -64,7 +64,7 @@ test.serial('It can save/restore/destroy an instance', t => {
         tasks: ['first', 'second', 'third'] 
     };
     
-    return Helpers.setupDatabase(Helpers.knex, [
+    return Helpers.setupDatabase([
         ['list', 'name:string', 'tasks:jsonb']
     ]).then(() => {
         
@@ -125,7 +125,7 @@ test.serial('It can save/restore a collection', t => {
         }
     ];
     
-    return Helpers.setupDatabase(Helpers.knex, [
+    return Helpers.setupDatabase([
         ['list', 'name:string', 'tasks:jsonb']
     ]).then(() => {
         return Lists.create(new_lists);
@@ -159,7 +159,7 @@ test.serial('It can create instances with defaults', t => {
         tasks: ['first', 'second', 'third'] 
     };
     
-    return Helpers.setupDatabase(Helpers.knex, [
+    return Helpers.setupDatabase([
         ['list', 'name:string', 'tasks:jsonb', 'tasks_count:integer']
     ]).then(() => {
         

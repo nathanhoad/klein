@@ -5,8 +5,6 @@ const Helpers = require('./helpers');
 const Log = require('../tasks/log');
 Log.silent = true;
 
-process.env.DATABASE_URL = 'postgres://localhost:5432/klein_test';
-
 
 test('It can create a new migration', t => {
     const Tasks = require('../tasks');
@@ -62,7 +60,7 @@ test('It can migrate and roll back', t => {
     process.env.APP_ROOT = '/tmp/klein/migrate-and-rollback';
     FS.removeSync(process.env.APP_ROOT);
     
-    return Helpers.emptyDatabase(Helpers.knex).then(() => {
+    return Helpers.emptyDatabase().then(() => {
         return Tasks.newModel(['users']);
         
     }).then(() => {
@@ -95,7 +93,7 @@ test.serial('It can get the current schema version', t => {
     process.env.APP_ROOT = '/tmp/klein/schema-version';
     FS.removeSync(process.env.APP_ROOT);
     
-    return Helpers.emptyDatabase(Helpers.knex).then(() => {
+    return Helpers.emptyDatabase().then(() => {
         return Tasks.newModel(['users']);
     }).then(() => {
         return Tasks.migrate();
@@ -112,11 +110,10 @@ test.serial('It can get the current schema version', t => {
 test.serial('It can get the schema for a table', t => {
     const Tasks = require('../tasks');
     
-    process.env.DATABASE_URL = 'postgres://localhost:5432/klein_test';
     process.env.APP_ROOT = '/tmp/klein/table-schema';
     FS.removeSync(process.env.APP_ROOT);
     
-    return Helpers.emptyDatabase(Helpers.knex).then(() => {
+    return Helpers.emptyDatabase().then(() => {
         return Tasks.newModel(['users', 'first_name:string', 'last_name:string', 'credit:integer']);
     }).then(() => {
         return Tasks.migrate();

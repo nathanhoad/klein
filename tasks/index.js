@@ -9,7 +9,7 @@ const { appRoot, loadConfig, saveTemplate, justFilename } = require('./util');
 
 function newMigration (args) {
     args = args || [];
-    const config = loadConfig();
+    const config = loadConfig(args);
 
     return new Promise((resolve, reject) => {
         if (args.length == 0) {
@@ -84,7 +84,7 @@ function newMigration (args) {
 
 function newModel (args) {
     args = args || [];
-    const config = loadConfig();
+    const config = loadConfig(args);
 
     return new Promise((resolve, reject) => {
         let files = [];
@@ -124,8 +124,9 @@ function newModel (args) {
 
 
 
-function migrate () {
-    let config = loadConfig();
+function migrate (args) {
+    args = args || [];
+    let config = loadConfig(args);
     
     var options = {
         directory: config.migrations_path,
@@ -156,8 +157,9 @@ function migrate () {
 }
 
 
-function rollback () {
-    let config = loadConfig();
+function rollback (args) {
+    args = args || [];
+    let config = loadConfig(args);
     
     var options = {
         directory: config.migrations_path,
@@ -188,8 +190,9 @@ function rollback () {
 }
 
 
-function version () {
-    let config = loadConfig();
+function version (args) {
+    args = args || [];
+    let config = loadConfig(args);
     
     var options = {
         directory: config.migrations_path,
@@ -213,9 +216,8 @@ function version () {
 
 
 function schemaForTable (args) {
-    let config = loadConfig();
-    
     args = args || [];
+    let config = loadConfig(args);
     
     let table = args[0];
     
@@ -250,9 +252,8 @@ function schemaForTable (args) {
 
 
 function schema (args) {
-    let config = loadConfig();
-    
     args = args || [];
+    let config = loadConfig(args);
     
     let table = args[0];
     return new Promise((resolve, reject) => {

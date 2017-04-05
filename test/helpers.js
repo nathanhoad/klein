@@ -1,9 +1,20 @@
+process.env.DATABASE_URL = 'postgres://localhost:5432/klein_test';
+
 const FS = require('fs-extra');
 const Knex = require('knex');
 const Tasks = require('../tasks');
 
 
-module.exports.emptyDatabase = (knex) => {
+const knex = Knex({
+    connection: process.env.DATABASE_URL,
+    client: 'pg',
+    returning: '*'
+});
+
+module.exports.knex = knex;
+
+
+module.exports.emptyDatabase = () => {
     return new Promise((resolve, reject) => {
         Promise.all([
             knex.schema.dropTableIfExists('schema_migrations'),
@@ -19,25 +30,17 @@ module.exports.emptyDatabase = (knex) => {
             resolve();
         });
     });
-}
+};
 
 
-module.exports.setupDatabase = (knex, models) => {
+module.exports.setupDatabase = (models) => {
     return new Promise((resolve, reject) => {
-        module.exports.emptyDatabase(knex).then(() => {
-            Promise.all(models.map(model => Promise.resolve(Tasks.newModel(model)))).then(results => {
-                resolve(Tasks.migrate());
+        module.exports.emptyDatabase().then(() => {
+            Promise.all(models.map(model => Tasks.newModel(model, { knex }))).then(results => {
+                resolve(Tasks.migrate({ knex }));
             }).catch(err => {
-                resolve();
+                reject(err);
             });
         });
     });
-}
-
-
-process.env.DATABASE_URL = 'postgres://localhost:5432/klein_test';
-module.exports.knex = require('knex')({
-    connection: process.env.DATABASE_URL,
-    client: 'pg',
-    returning: '*'
-});
+};
