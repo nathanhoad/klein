@@ -1,0 +1,37 @@
+#! /usr/bin/env node
+
+const Tasks = require('../tasks');
+const Log = require('../tasks/log');
+
+// Consume 'node' and this scripts name
+const args = process.argv.slice(2, 999);
+
+switch (args[0]) {
+    case 'new':
+        if (args[1] === 'migration') {
+            Tasks.newMigration(args.slice(2, 999));
+        } else if (args[1] === 'model') {
+            Tasks.newModel(args.slice(2, 999));
+        }
+        break;
+        
+    case 'db':
+        switch (args[1]) {
+            case 'migrate':
+                Tasks.migrate();
+                break;
+            case 'rollback':
+                Tasks.rollback();
+                break;
+            case 'version':
+                Tasks.version();
+                break;
+            case 'schema':
+            default:
+                Tasks.schema();
+        }
+        break;
+        
+    default:
+        Log.error('Unknown command');
+}
