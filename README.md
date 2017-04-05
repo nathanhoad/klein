@@ -161,7 +161,7 @@ Contexts are defined on the model:
 const Users = Klein.model('users', {
     contexts: {
         simple: ['list', 'of', 'field', 'names'], // only these fields are included in the resulting object
-        derived (user) { // given an Immutable.Map, return an Immutable.Map
+        derived (user) { // given an Immutable.Map of the instance, return a Map or object
             return user.merge({
                 full_name: [user.get('first_name'), user.get('last_name')].join(' ')
             });
