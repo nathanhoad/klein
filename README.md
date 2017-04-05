@@ -5,11 +5,6 @@ A small ORM that combines ImmutableJS and knex.
 Models are just Immutable Maps and have no database related instance methods. All querying is done statically from the model's class.
 
 
-## Todo
-
-* Transactions
-
-
 ## Migration CLI
 
 Generate a new model (and migration):
@@ -223,5 +218,31 @@ And then retrieve them.
 ```javascript
 Users.include('projects').all().then(users => {
     users.first().get('project');
+});
+```
+
+
+## Transactions
+
+To wrap your actions inside a transaction just call:
+
+```javascript
+const Klein = require('klein').connect(process.env.DATABASE_URL);
+const Users = Klein.model('users');
+const Hats = Klein.model('hats');
+
+Klein.transaction(transaction => {
+    let nathan = {
+        name: 'Nathan'
+    };
+    
+    return Users.create(nathan, { transaction }).then(user => {
+        return Hats.create({ type: 'Cowboy' }, { transaction });
+    });
+    
+}).then(() => {
+    // User and Hat are both committed to the database now
+}).catch(err => {
+    // Something failed and both User and Hat are now rolled back
 });
 ```
