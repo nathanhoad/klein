@@ -7,9 +7,9 @@ const { appRoot, loadConfig, saveTemplate, justFilename } = require('./util');
 
 
 
-function newMigration (args) {
+function newMigration (args, config) {
     args = args || [];
-    const config = loadConfig(args);
+    config = loadConfig(config);
 
     return new Promise((resolve, reject) => {
         if (args.length == 0) {
@@ -29,28 +29,32 @@ function newMigration (args) {
 
         let name = args[0].replace(/\s/g, '-');
         
-        let table_name = Inflect.tableize(name);
+        let table_name = Inflect.tableize(name.replace('create-', ''));
         
         let migration_name = Inflect.dasherize(name);
         let migration_template = 'migration.js';
         
-        let add_columns = '';
-        let drop_columns = '';
+        let action = 'table';
         
-        if (args.includes('model')) {
+        // Convert name:string counter:integer -> table.string('name'), table.integer('counter')
+        let add_columns = args.filter(c => c.includes(':')).map(c => {
+            let cs = c.split(':');
+            return `table.${cs[1]}('${cs[0]}');`;
+        }).join('\n\t\t\t');
+        let indices = args.filter(c => c.includes(':') && c.includes('_id:')).map(c => `table.index('${c.split(':')[0]}');`).join('\n\t\t\t');
+        let drop_columns = `table.dropColumns(${args.filter(c => c.includes(':')).map(c => `'${c.split(':')[0]}'`).join(', ')});`;
+        
+        if (args.includes('model') || name.includes('create-')) {
             migration_name = `create-${Inflect.dasherize(Inflect.pluralize(name))}`;
             migration_template = 'model-migration.js';
-            
-            // Convert name:string counter:integer -> table.string('name'), table.integer('counter')
-            add_columns = args.filter(c => c.includes(':')).map(c => {
-                let cs = c.split(':');
-                return `table.${cs[1]}('${cs[0]}');`;
-            }).join('\n\t\t\t');
+            if (indices.length > 0) indices = "\n\t\t\t" + indices;
             
         } else {
+            if (indices.length > 0) indices = "\n\t\t\t\n\t\t\t" + indices;
+            
             let matches = name.match(/^add\-(.*?)-to-(.*?)$/);
             if (matches && matches.length == 3) {
-                table_name = matches[2];
+                table_name = Inflect.underscore(matches[2]);
                 
                 // Convert add-name-and-counter-to-users -> table.string('name'), table.string('counter')
                 let columns = matches[1].split('-and-').map(c => Inflect.underscore(c));
@@ -58,17 +62,22 @@ function newMigration (args) {
                     return `table.string('${c}');`;
                 }).join('\n\t\t\t');
                 
-                drop_columns = `table.dropColumns(${columns.map(c => `'${c}'`).join()});`;
+                let indices = columns.filter(c => c.includes('_id:')).map(c => `table.index('${c.split(':')[0]}');`).join('\n\t\t\t');
+                if (indices.length > 0) indices = "\n\t\t\t\n\t\t\t" + indices;
+                
+                drop_columns = `table.dropColumns(${columns.map(c => `'${c}'`).join(', ')});`;
             } else {
-                table_name = name.split('-')[name.split('-').length - 1];
+                table_name = Inflect.underscore(name.replace('create-', ''));
             }
         }
 
         config.knex.migrate.make(migration_name, options).then((migration_path) => {
             saveTemplate(migration_template, {
+                action: action,
                 table: table_name,
                 add_columns: add_columns,
-                drop_columns: drop_columns
+                drop_columns: drop_columns,
+                indices: indices
             }, migration_path);
             Log.info('Created migration', Log.bold(justFilename(migration_path, options.directory)));
 
@@ -82,9 +91,9 @@ function newMigration (args) {
 }
 
 
-function newModel (args) {
+function newModel (args, config) {
     args = args || [];
-    const config = loadConfig(args);
+    config = loadConfig(config);
 
     return new Promise((resolve, reject) => {
         let files = [];
@@ -124,9 +133,9 @@ function newModel (args) {
 
 
 
-function migrate (args) {
+function migrate (args, config) {
     args = args || [];
-    let config = loadConfig(args);
+    config = loadConfig(config);
     
     var options = {
         directory: config.migrations_path,
@@ -135,7 +144,7 @@ function migrate (args) {
     }
     
     return new Promise((resolve, reject) => {
-        config.knex.migrate.latest(options).then((results) => {
+        return config.knex.migrate.latest(options).then(results => {
             let files = [];
             
             if (results[1].length == 0) {
@@ -147,7 +156,14 @@ function migrate (args) {
                     files.push(migration_path);
                 });
             }
-            return resolve(files);
+            
+            if (config.knex_test) {
+                config.knex_test.migrate.latest(options).then(results => {
+                    return resolve(files);
+                });
+            } else {
+                return resolve(files);
+            }
             
         }).catch((err) => {
             Log.error(err);
@@ -157,9 +173,9 @@ function migrate (args) {
 }
 
 
-function rollback (args) {
+function rollback (args, config) {
     args = args || [];
-    let config = loadConfig(args);
+    config = loadConfig(config);
     
     var options = {
         directory: config.migrations_path,
@@ -180,7 +196,14 @@ function rollback (args) {
                     files.push(migration_path);
                 });
             }
-            return resolve(files);
+            
+            if (config.knex_test) {
+                config.knex_test.migrate.rollback(options).then(results => {
+                    return resolve(files);
+                });
+            } else {
+                return resolve(files);
+            }
             
         }).catch((err) => {
             Log.error(err);
@@ -190,9 +213,9 @@ function rollback (args) {
 }
 
 
-function version (args) {
+function version (args, config) {
     args = args || [];
-    let config = loadConfig(args);
+    config = loadConfig(config);
     
     var options = {
         directory: config.migrations_path,
@@ -215,15 +238,15 @@ function version (args) {
 }
 
 
-function schemaForTable (args) {
+function schemaForTable (args, config) {
     args = args || [];
-    let config = loadConfig(args);
+    config = loadConfig(config);
     
     let table = args[0];
     
-    return config.knex.raw(`select column_name, data_type, is_nullable, column_default from information_schema.columns where table_name = '${table}';`).then((result) => {
+    return config.knex.raw(`select column_name, data_type, is_nullable, column_default from information_schema.columns where table_name = '${table}';`).then(result => {
         let columns = [];
-        result.rows.forEach((column) => {
+        result.rows.forEach(column => {
             let meta = [];
             
             if (column.is_nullable == 'NO') {
@@ -246,55 +269,76 @@ function schemaForTable (args) {
             });
         });
         
-        return Promise.resolve({ table: table, columns: columns });
+        return { table: table, columns: columns };
     });
 }
 
 
-function schema (args) {
+function schema (args, config) {
     args = args || [];
-    let config = loadConfig(args);
+    config = loadConfig(config);
     
     let table = args[0];
-    return new Promise((resolve, reject) => {
-        if (table) {
-            return schemaForTable(config, [table]).then((schema) => {
-                Log.info(Log.bold(schema.table.toUpperCase()));
-                
-                schema.columns.forEach((column) => {
-                    Log.info(`${column.name}:`, Log.yellow(column.type), Log.gray(column.meta));
-                });
-                
-                return resolve([schema]);
+    if (table) {
+        return schemaForTable(config, [table]).then(schema => {
+            Log.info(Log.bold(schema.table.toUpperCase()));
+            
+            schema.columns.forEach(column => {
+                Log.info(`${column.name}:`, Log.yellow(column.type), Log.gray(column.meta));
             });
             
-        } else {
-            return config.knex.raw("select table_name from information_schema.tables where table_schema = 'public'").then((result) => {
-                let queries = [];
-                
-                result.rows.forEach((table) => {
-                    if (table.table_name.includes('schema_migrations')) return;
-                    queries.push(schemaForTable([table.table_name]));
-                });
-                
-                // return resolve(Promise.all(queries));
-                return Promise.all(queries).then((schemas) => {
-                    schemas.forEach((schema, index) => {
-                        Log.info(Log.bold(schema.table.toUpperCase()));
-                        
-                        schema.columns.forEach((column) => {
-                            Log.info(`${column.name}:`, Log.yellow(column.type), Log.gray(column.meta));
-                        });
-                        
-                        if (index < schemas.length - 1) {
-                            Log.info('');
-                        }
+            return [schema];
+        });
+        
+    } else {
+        return config.knex.raw("select table_name from information_schema.tables where table_schema = 'public'").then(result => {
+            let queries = [];
+            
+            result.rows.forEach(table => {
+                if (table.table_name.includes('schema_migrations')) return;
+                queries.push(schemaForTable([table.table_name]));
+            });
+            
+            // return resolve(Promise.all(queries));
+            return Promise.all(queries).then((schemas) => {
+                schemas.forEach((schema, index) => {
+                    Log.info(Log.bold(schema.table.toUpperCase()));
+                    
+                    schema.columns.forEach((column) => {
+                        Log.info(`${column.name}:`, Log.yellow(column.type), Log.gray(column.meta));
                     });
                     
-                    return resolve(schemas);
+                    if (index < schemas.length - 1) {
+                        Log.info('');
+                    }
                 });
+                
+                return schemas;
             });
+        });
+    }
+}
+
+
+function emptyDatabase (args, config) {
+    args = args || [];
+    config = loadConfig(config);
+    
+    
+    return config.knex_test.raw("select table_name from information_schema.tables where table_schema = 'public'").then(result => {
+        let rows = result.rows;
+        
+        if (!args.includes('include_schema')) {
+            rows = rows.filter(t => !t.table_name.includes('schema_migrations'));
         }
+        
+        return Promise.all(rows.map(t => {
+            if (args.includes('drop')) {
+                return config.knex_test.schema.dropTable(t.table_name);
+            } else {
+                return config.knex_test(t.table_name).truncate();
+            }
+        }));
     });
 }
     
@@ -302,9 +346,9 @@ function schema (args) {
     
 module.exports = {
     newMigration,
-    newModel: (args) => {
-        return newMigration(args.concat('model')).then(migration_files => {
-            return newModel(args).then(model_files => {
+    newModel: (args, config) => {
+        return newMigration(args.concat('model'), config).then(migration_files => {
+            return newModel(args, config).then(model_files => {
                 return migration_files.concat(model_files);
             });
         })
@@ -312,5 +356,11 @@ module.exports = {
     migrate,
     rollback,
     version,
-    schema
+    schema,
+    emptyDatabase,
+    
+    unknown (command) {
+        Log.error(`Unkown command '${command}'`);
+        return Promise.resolve();
+    }
 };

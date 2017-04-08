@@ -15,29 +15,15 @@ module.exports.knex = knex;
 
 
 module.exports.emptyDatabase = () => {
-    return new Promise((resolve, reject) => {
-        Promise.all([
-            knex.schema.dropTableIfExists('schema_migrations'),
-            knex.schema.dropTableIfExists('schema_migrations_lock'),
-            knex.schema.dropTableIfExists('users'),
-            knex.schema.dropTableIfExists('lists'),
-            knex.schema.dropTableIfExists('teams'),
-            knex.schema.dropTableIfExists('projects_users'),
-            knex.schema.dropTableIfExists('projects')
-        ]).then(() => {
-            resolve();
-        }).catch(err => {
-            resolve();
-        });
-    });
+    return Tasks.emptyDatabase(['drop', 'include_schema'], { knex, knex_test: knex });
 };
 
 
 module.exports.setupDatabase = (models) => {
     return new Promise((resolve, reject) => {
         module.exports.emptyDatabase().then(() => {
-            Promise.all(models.map(model => Tasks.newModel(model, { knex }))).then(results => {
-                resolve(Tasks.migrate({ knex }));
+            Promise.all(models.map(model => Tasks.newModel(model, { knex, knex_test: knex }))).then(results => {
+                resolve(Tasks.migrate([], { knex, knex_test: knex }));
             }).catch(err => {
                 reject(err);
             });

@@ -1,7 +1,7 @@
 module.exports = {
     up (knex, Promise) {
-        return knex.schema.table('{{TABLE}}', (table) => {
-            {{ADD_COLUMNS}}
+        return knex.schema.{{ACTION}}('{{TABLE}}', (table) => {
+            {{ADD_COLUMNS}}{{INDICES}}
         });
     },
 

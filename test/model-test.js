@@ -13,17 +13,29 @@ const Klein = require('../lib').connect();
 test('It can build independent queries', t => {
     const Users = Klein.model('users');
     
-    const q1 = Users.where({ email: 'test@test.com' }).toString();
-    t.is(q1, `select * from "users" where "email" = 'test@test.com'`);
+    const where = Users.where({ email: 'test@test.com' }).toString();
+    t.is(where, `select * from "users" where "email" = 'test@test.com'`);
     
-    const q2 = Users.where('email', 'like', '%test%').toString();
-    t.is(q2, `select * from "users" where "email" like '%test%'`);
+    const where_like = Users.where('email', 'like', '%test%').toString();
+    t.is(where_like, `select * from "users" where "email" like '%test%'`);
     
-    const q3 = Users.where({ name: 'Test'}).page(2, 20).toString();
-    t.is(q3, `select * from "users" where "name" = 'Test' limit 2 offset 40`);
+    const paging = Users.where({ name: 'Test'}).page(3, 20).toString();
+    t.is(paging, `select * from "users" where "name" = 'Test' limit 20 offset 40`);
     
-    const q4 = Users.order('created_at desc').toString();
-    t.is(q4, `select * from "users" order by created_at desc`);
+    const order = Users.order('created_at desc').toString();
+    t.is(order, `select * from "users" order by created_at desc`);
+    
+    const where_in = Users.whereIn('name', ['Nathan', 'Lilly']).toString();
+    t.is(where_in, `select * from "users" where "name" in ('Nathan', 'Lilly')`);
+    
+    const where_not_in = Users.whereNotIn('name', ['Nathan', 'Lilly']).toString();
+    t.is(where_not_in, `select * from "users" where "name" not in ('Nathan', 'Lilly')`);
+    
+    const where_null = Users.whereNull('name').toString();
+    t.is(where_null, `select * from "users" where "name" is null`);
+    
+    const where_not_null = Users.whereNotNull('name').toString();
+    t.is(where_not_null, `select * from "users" where "name" is not null`);
 });
 
 

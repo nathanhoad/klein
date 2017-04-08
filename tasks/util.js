@@ -1,3 +1,5 @@
+require('dotenv').load({ silent: true });
+
 const Path = require('path');
 const FS = require('fs-extra');
 const Knex = require('knex');
@@ -22,7 +24,9 @@ function appRoot () {
 }
 
 
-function loadConfig (args) {
+function loadConfig (config) {
+    if (typeof config === "undefined") config = {};
+    
     const app_root = appRoot();
     
     let migrations_path = `${app_root}/migrations`;
@@ -43,13 +47,17 @@ function loadConfig (args) {
     }
     
     return {
-        app_root: args.app_root || app_root,
-        migrations_path: args.migrations_path || migrations_path,
-        models_path: args.models_path || models_path,
-        knex: args.knex || Knex({
+        app_root: config.app_root || app_root,
+        migrations_path: config.migrations_path || migrations_path,
+        models_path: config.models_path || models_path,
+        knex: config.knex || Knex({
             client: 'pg',
             connection: process.env.DATABASE_URL
-        })
+        }),
+        knex_test: config.knex_test || (process.env.TEST_DATABASE_URL ? Knex({
+            client: 'pg',
+            connection: process.env.TEST_DATABASE_URL
+        }) : null)
     }
 }
 

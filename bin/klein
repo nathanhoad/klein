@@ -1,37 +1,38 @@
 #! /usr/bin/env node
 
 const Tasks = require('../tasks');
-const Log = require('../tasks/log');
 
 // Consume 'node' and this scripts name
 const args = process.argv.slice(2, 999);
 
-switch (args[0]) {
-    case 'new':
-        if (args[1] === 'migration') {
-            Tasks.newMigration(args.slice(2, 999));
-        } else if (args[1] === 'model') {
-            Tasks.newModel(args.slice(2, 999));
-        }
-        break;
-        
-    case 'db':
-        switch (args[1]) {
-            case 'migrate':
-                Tasks.migrate();
-                break;
-            case 'rollback':
-                Tasks.rollback();
-                break;
-            case 'version':
-                Tasks.version();
-                break;
-            case 'schema':
-            default:
-                Tasks.schema();
-        }
-        break;
-        
-    default:
-        Log.error('Unknown command');
+function task (args) {
+    switch (args[0]) {
+        case 'new':
+            if (args[1] === 'migration') {
+                return Tasks.newMigration(args.slice(2, 999));
+            } else if (args[1] === 'model') {
+                return Tasks.newModel(args.slice(2, 999));
+            } else {
+                return Tasks.unknown(args[0]);
+            }
+            break;
+            
+        case 'db':
+            switch (args[1]) {
+                case 'migrate': return Tasks.migrate();
+                case 'rollback': return Tasks.rollback();
+                case 'version': return Tasks.version();
+                case 'schema':
+                default:
+                    return Tasks.schema();
+            }
+            break;
+            
+        default:
+            return Tasks.unknown(args[0]);
+    }
 }
+
+task(args).then(() => {
+    process.exit();
+});
