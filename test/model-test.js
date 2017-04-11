@@ -143,6 +143,8 @@ test.serial('It can save/restore a collection', t => {
         return Lists.create(new_lists);
     }).then(lists => {
         
+        t.is(lists.getIn([0, 'name']), new_lists[0].name);
+        
         return Lists.all();
         
     }).then(lists => {
