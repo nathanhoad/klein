@@ -8,7 +8,7 @@ Log.silent = true;
 const Helpers = require('./helpers');
 const Tasks = require('../tasks');
 
-const Klein = require('../lib').connect();
+const Klein = require('..').connect();
 
 
 test('It can load belongs_to and has_many relations', t => {

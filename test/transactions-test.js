@@ -7,7 +7,7 @@ const Log = require('../tasks/log');
 Log.silent = true;
 const Helpers = require('./helpers');
 
-const Klein = require('../lib').connect();
+const Klein = require('..').connect();
 
 
 test('It can create a model and fetch it within a transaction', t => {

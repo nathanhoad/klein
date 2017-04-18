@@ -34,9 +34,28 @@ Get the schema (for a table):
 
 ## Usage
 
+The easiest init is:
+
+```javascript
+// Assumes that process.env.DATABASE_URL is set
+const Klein = require('klein/auto');
+```
+
+But if you need to specify a database URL:
+
 ```javascript
 const Klein = require('klein').connect(process.env.DATABASE_URL);
+```
 
+Or, if you already have an instanciated `knex` object:
+
+```javascript
+const Klein = require('klein').connect(knex);
+```
+
+Then you can define a model:
+
+```javascript
 const Users = Klein.model('users');
 ```
 
@@ -246,3 +265,8 @@ Klein.transaction(transaction => {
     // Something failed and both User and Hat are now rolled back
 });
 ```
+
+
+## TODO
+
+* Model validations

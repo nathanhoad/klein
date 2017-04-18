@@ -7,7 +7,7 @@ const Log = require('../tasks/log');
 Log.silent = true;
 const Helpers = require('./helpers');
 
-const Klein = require('../lib').connect();
+const Klein = require('../auto');
 
 
 test('It can build independent queries', t => {
@@ -287,6 +287,32 @@ test('it can convert a list of models to json', t => {
     t.is(Object.keys(json2[0]).length, Object.keys(users.get(0).toJS()).length);
     t.is(json2[1].first_name, users.getIn([1, 'first_name']));
     t.is(Object.keys(json2[1]).length, Object.keys(users.get(1).toJS()).length);
+});
+
+
+test('It defaults to using the default context if it exists', t => {
+    const Users = Klein.model('users', {
+        contexts: {
+            default (user) {
+                return user.merge({
+                    used_default: true
+                });
+            }
+        }
+    });
+    
+    const user = Immutable.fromJS({
+        first_name: 'Nathan',
+        last_name: 'Hoad',
+        email: 'test@test.com',
+        created_at: new Date()
+    });
+    
+    const json1 = Users.json(user);
+    t.is(json1.used_default, true);
+    
+    const json2 = Users.json([user, user]);
+    t.is(json2[0].used_default, true);
 });
 
 

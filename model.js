@@ -298,6 +298,8 @@ class Model {
     
     
     json (instance_or_list, context) {
+        if (typeof context === "undefined") context = 'default';
+        
         // If a List is given then map over the items
         if (instance_or_list instanceof Immutable.List || instance_or_list instanceof Array) {
             const list = instance_or_list.map(instance => this.json(instance, context));
