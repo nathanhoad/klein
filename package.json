@@ -17,6 +17,14 @@
   ],
   "author": "Nathan Hoad",
   "license": "ISC",
+  "homepage": "https://github.com/nathanhoad/klein#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nathanhoad/klein.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nathanhoad/klein/issues"
+  },
   "dependencies": {
     "chalk": "^1.1.3",
     "dotenv": "^4.0.0",
