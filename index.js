@@ -1,3 +1,5 @@
+require('dotenv').load({ silent: true });
+
 const knex = require('knex');
 const uuid = require('uuid/v4');
 const Model = require('./model');
