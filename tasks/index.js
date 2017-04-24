@@ -57,15 +57,18 @@ function newMigration (args, config) {
                 table_name = Inflect.underscore(matches[2]);
                 
                 // Convert add-name-and-counter-to-users -> table.string('name'), table.string('counter')
-                let columns = matches[1].split('-and-').map(c => Inflect.underscore(c));
-                add_columns = columns.map(c => {
-                    return `table.string('${c}');`;
-                }).join('\n\t\t\t');
+                // only if we didn't specify fields as arguments
+                if (add_columns === '') {
+                    let columns = matches[1].split('-and-').map(c => Inflect.underscore(c));
+                    add_columns = columns.map(c => {
+                        return `table.string('${c}');`;
+                    }).join('\n\t\t\t');
                 
-                let indices = columns.filter(c => c.includes('_id:')).map(c => `table.index('${c.split(':')[0]}');`).join('\n\t\t\t');
-                if (indices.length > 0) indices = "\n\t\t\t\n\t\t\t" + indices;
+                    let indices = columns.filter(c => c.includes('_id:')).map(c => `table.index('${c.split(':')[0]}');`).join('\n\t\t\t');
+                    if (indices.length > 0) indices = "\n\t\t\t\n\t\t\t" + indices;
                 
-                drop_columns = `table.dropColumns(${columns.map(c => `'${c}'`).join(', ')});`;
+                    drop_columns = `table.dropColumns(${columns.map(c => `'${c}'`).join(', ')});`;
+                }
             } else {
                 table_name = Inflect.underscore(name.replace('create-', ''));
             }

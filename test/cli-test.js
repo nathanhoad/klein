@@ -26,6 +26,26 @@ test('It can create a new migration', t => {
 });
 
 
+test('It can create a new migration with supplied column details', t => {
+    const Tasks = require('../tasks');
+    process.env.APP_ROOT = '/tmp/klein/new-migration-with-columns';
+    FS.removeSync(process.env.APP_ROOT);
+    
+    return Tasks.newMigration(['add-age-to-users', 'age:integer']).then(files => {
+        t.is(files.length, 1);
+        t.regex(files[0], /\d+_add-age-to-users\.js/);
+        
+        var file_contents = FS.readFileSync(files[0], "utf8");
+        
+        t.true(file_contents.includes('up (knex, Promise) {'));
+        t.true(file_contents.includes('down (knex, Promise) {'));
+        
+        t.true(file_contents.includes(`return knex.schema.table('users', (table) => {`));
+        t.true(file_contents.includes(`table.integer('age');`));
+    });
+});
+
+
 test('It can create a new model', t => {
     const Tasks = require('../tasks');
     
