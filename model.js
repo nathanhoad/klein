@@ -264,9 +264,7 @@ class Model {
             query = query.transacting(options.transaction);
         }
         
-        return query.del().then(() => {
-            resolve();
-        });
+        return query.del();
     }
     
     
