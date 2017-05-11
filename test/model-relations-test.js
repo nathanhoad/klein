@@ -89,7 +89,7 @@ test('It can load belongs_to and has_many relations', t => {
 });
 
 
-test('It can load has_many_through relations', t => {
+test('It can load has_and_belongs_to_many relations', t => {
     const Users = Klein.model('users', {
         relations: {
             projects: { has_and_belongs_to_many: 'projects' }
@@ -181,6 +181,7 @@ test('It can save an object that has has_and_belongs_to_many relations on it', t
             users: { has_and_belongs_to_many: 'users' }
         }
     });
+    const ProjectsUsers = Klein.model('projects_users');
     
     process.env.APP_ROOT = '/tmp/klein/belongs-to';
     FS.removeSync(process.env.APP_ROOT);
@@ -237,6 +238,17 @@ test('It can save an object that has has_and_belongs_to_many relations on it', t
             
             t.true(typeof project.get('id') !== "undefined");
             
+            // Make sure subsequent saves don't add duplicates
+            
+            return Users.save(users.first());
+            
+        }).then(user => {
+            
+            t.is(user.get('projects').count(), 3);
+            
+            ProjectsUsers.all().then(projects_users => {
+                t.is(projects_users.count(), 3);
+            });
         });
     });
 });

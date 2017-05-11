@@ -508,20 +508,20 @@ class Model {
                     // eg. for each project, create it if it doesn't exist and create a projects_users for it if that doesn't exist
                     return Promise.all(related_objects.map(related_object => {
                         // create the related_object first so that we have an id for the join row
-                        return RelatedModel.save(related_object, Object.assign({}, options, { exists: existing_related_ids.includes(related_object.id) })).then(object => {
-                            if (existing_related_object_ids.includes(object.id)) {
-                                return object;
+                        return RelatedModel.save(related_object, Object.assign({}, options, { exists: existing_related_ids.includes(related_object.id) })).then(related_model => {
+                            if (existing_related_object_ids.includes(related_model.get('id'))) {
+                                return related_model;
                             } else {
                                 const new_join_row = {
                                     id: uuid(),
-                                    [relation.key]: object.get('id'),
+                                    [relation.key]: related_model.get('id'),
                                     [relation.source_key]: model.id,
                                     updated_at: new Date(),
                                     created_at: new Date()
                                 }
                                 
                                 return this.knex(relation.through_table, options).insert(new_join_row, 'id').then(() => {
-                                    return object;
+                                    return related_model;
                                 });
                             }
                         }).then(related_object => {
