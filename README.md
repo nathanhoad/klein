@@ -38,7 +38,7 @@ You can configure where Klein will put the models and migrations in your `packag
 ```javascript
 {
     "klein": {
-        "migrations": "migrations"
+        "migrations_path": "migrations"
         "models_path": "app/server/models"
     }
 }
