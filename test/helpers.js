@@ -19,14 +19,14 @@ module.exports.emptyDatabase = () => {
 };
 
 
-module.exports.setupDatabase = (models) => {
-    return new Promise((resolve, reject) => {
-        module.exports.emptyDatabase().then(() => {
-            Promise.all(models.map(model => Tasks.newModel(model, { knex, knex_test: knex }))).then(results => {
-                resolve(Tasks.migrate([], { knex, knex_test: knex }));
-            }).catch(err => {
-                reject(err);
-            });
+module.exports.setupDatabase = (models, config) => {
+    return module.exports.emptyDatabase().then(() => {
+        const tasks = models.map(model => {
+            return Tasks.newModel(model, Object.assign({}, { knex, knex_test: knex }, config));
+        });
+        
+        return Promise.all(tasks).then(results => {
+            return Tasks.migrate([], { knex, knex_test: knex });
         });
     });
 };

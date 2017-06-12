@@ -49,6 +49,20 @@ function newMigration (args, config) {
             migration_template = 'model-migration.js';
             if (indices.length > 0) indices = "\n\t\t\t" + indices;
             
+            if (config.timestamps.created_at || config.timestamps.updated_at) {
+                add_columns += "\n";
+                if (config.timestamps.created_at) {
+                    add_columns += `\n\t\t\ttable.timestamp('${config.timestamps.created_at}');`;
+                    indices += `\n\t\t\ttable.index('${config.timestamps.created_at}');`;
+                }
+                if (config.timestamps.updated_at) {
+                    add_columns += `\n\t\t\ttable.timestamp('${config.timestamps.updated_at}');`;
+                    indices += `\n\t\t\ttable.index('${config.timestamps.updated_at}');`;
+                }
+                add_columns += "\n";
+            }
+            
+            
         } else {
             if (indices.length > 0) indices = "\n\t\t\t\n\t\t\t" + indices;
             
@@ -124,8 +138,28 @@ function newModel (args, config) {
             return resolve([]);
         }
         
+        // See if we need timestamps
+        let model_properties = [];
+        if (config.timestamps === false || (config.timestamps.created_at === false && config.timestamps.updated_at === false)) {
+            model_properties = `, {\n\ttimestamps: false\n }`;
+        } else {
+            if (config.timestamps.created_at !== "created_at") {
+                model_properties.push(`\n\t\tcreated_at: '${config.timestamps.created_at}'`);
+            }
+            if (config.timestamps.updated_at !== "updated_at") {
+                model_properties.push(`\n\t\tupdated_at: '${config.timestamps.updated_at}'`);
+            }
+            
+            if (model_properties.length > 0) {
+                model_properties = `, {\n\ttimestamps: {${model_properties.join("")}\n\t}\n}`;
+            } else {
+                model_properties = '';
+            }
+        }
+        
         saveTemplate('model.js', {
-            table: table_name
+            table: table_name,
+            model_properties
         }, model_path);
         Log.info("Created model", Log.bold(justFilename(model_path, config.models_path)));
         files = files.concat(model_path);

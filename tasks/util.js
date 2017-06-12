@@ -27,7 +27,7 @@ function appRoot () {
 function loadConfig (config) {
     if (typeof config === "undefined") config = {};
     
-    const app_root = appRoot();
+    const app_root = config.app_root || appRoot();
     
     let migrations_path = `${app_root}/migrations`;
     let models_path = `${app_root}/app/server/models`;
@@ -46,10 +46,25 @@ function loadConfig (config) {
         migrations_path = `${app_root}/app/server/migrations`;
     }
     
+    // See if we can load anything from the projects package.json
+    try {
+        const package_config = require(`${app_root}/package.json`);
+        config = Object.assign({}, package_config.klein, config);
+        
+        migrations_path = `${app_root}/${config.migrations_path}`;
+        models_path = `${app_root}/${config.models_path}`;
+    } catch (e) {
+        // Do nothing
+    }
+    
     return {
-        app_root: config.app_root || app_root,
-        migrations_path: config.migrations_path || migrations_path,
-        models_path: config.models_path || models_path,
+        app_root,
+        migrations_path: migrations_path,
+        models_path: models_path,
+        timestamps: typeof config.timestamps !== "undefined" ? config.timestamps : { 
+            created_at: 'created_at', 
+            updated_at: 'updated_at' 
+        },
         knex: config.knex || Knex({
             client: 'pg',
             connection: process.env.DATABASE_URL

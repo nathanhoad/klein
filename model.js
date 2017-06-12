@@ -10,6 +10,13 @@ class Model {
         this.klein = args.klein;
         this.args = args;
         
+        // `timestamps` can be either a hash of { created_at, updated_at } or false
+        const timestamps = (args.timestamps === false ? { created_at: false, updated_at: false } : args.timestamps);
+        this.timestamp_fields = Object.assign({}, {
+            created_at: 'created_at',
+            updated_at: 'updated_at'
+        }, timestamps);
+        
         if (args.default_scope) {
             this.query = args.default_scope;
         } else {
@@ -128,7 +135,7 @@ class Model {
         
         // Convert everything to something we can put into the database
         properties = this._serialize(properties);
-        properties.updated_at = new Date();
+        this._updateTimestamp(properties, 'updated_at');
         
         return Promise.resolve().then(() => {
             // Check to see if this model has been persisted
@@ -146,7 +153,7 @@ class Model {
             if (exists) {
                 return this.knex(this.table_name, options).where({ id: properties.id }).update(properties, '*');
             } else {
-                properties.created_at = new Date();
+                this._updateTimestamp(properties, 'created_at');
                 return this.knex(this.table_name, options).insert(properties, '*');
             }
         }).then(results => {
@@ -515,10 +522,11 @@ class Model {
                                 const new_join_row = {
                                     id: uuid(),
                                     [relation.key]: related_model.get('id'),
-                                    [relation.source_key]: model.id,
-                                    updated_at: new Date(),
-                                    created_at: new Date()
+                                    [relation.source_key]: model.id
                                 }
+                                
+                                this._updateTimestamp(new_join_row, 'updated_at');
+                                this._updateTimestamp(new_join_row, 'created_at');
                                 
                                 return this.knex(relation.through_table, options).insert(new_join_row, 'id').then(() => {
                                     return related_model;
@@ -628,6 +636,13 @@ class Model {
             
             return results;
         });
+    }
+    
+    
+    _updateTimestamp (properties, field) {
+        if (this.timestamp_fields[field]) {
+            properties[this.timestamp_fields[field]] = new Date();
+        }
     }
 }
 

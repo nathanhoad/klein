@@ -74,6 +74,72 @@ test('It can create a new model', t => {
 });
 
 
+test('It can create a new model with different timestamp names', t => {
+    const Tasks = require('../tasks');
+    
+    process.env.APP_ROOT = '/tmp/klein/new-model-with-different-timestamps';
+    FS.removeSync(process.env.APP_ROOT);
+    
+    return Tasks.newModel(['users', 'name:string'], { timestamps: { created_at: 'createdAt', updated_at: 'updatedAt' }}).then(files => {
+        t.is(files.length, 2);
+        t.regex(files[0], /\d+_create-users\.js/);
+        t.regex(files[1], /users\.js/);
+        
+        var file_contents = FS.readFileSync(files[0], "utf8");
+        
+        t.true(file_contents.includes('up (knex, Promise) {'));
+        t.true(file_contents.includes('down (knex, Promise) {'));
+        
+        t.true(file_contents.includes(`return knex.schema.createTable('users', (table) => {`));
+        t.true(file_contents.includes(`table.string('name');`));
+        t.true(file_contents.includes(`table.timestamp('createdAt');`));
+        t.true(file_contents.includes(`table.timestamp('updatedAt');`));
+        t.true(file_contents.includes(`table.index('createdAt');`));
+        t.true(file_contents.includes(`table.index('updatedAt');`));
+        
+        var file_contents = FS.readFileSync(files[1], "utf8");
+        
+        t.true(file_contents.includes(`module.exports = Klein.model('users', {`));
+        t.true(file_contents.includes(`timestamps: {`));
+        t.true(file_contents.includes(`created_at: 'createdAt'`));
+        t.true(file_contents.includes(`updated_at: 'updatedAt'`));
+    });
+});
+
+
+test('It can create a new model without timestamps', t => {
+    const Tasks = require('../tasks');
+    
+    process.env.APP_ROOT = '/tmp/klein/new-model-without-timestamps';
+    FS.removeSync(process.env.APP_ROOT);
+    
+    return Tasks.newModel(['users', 'name:string'], { timestamps: { created_at: false, updated_at: false }}).then(files => {
+        t.is(files.length, 2);
+        t.regex(files[0], /\d+_create-users\.js/);
+        t.regex(files[1], /users\.js/);
+        
+        var file_contents = FS.readFileSync(files[0], "utf8");
+        
+        t.true(file_contents.includes('up (knex, Promise) {'));
+        t.true(file_contents.includes('down (knex, Promise) {'));
+        
+        t.true(file_contents.includes(`return knex.schema.createTable('users', (table) => {`));
+        t.true(file_contents.includes(`table.string('name');`));
+        t.false(file_contents.includes(`table.timestamp('createdAt');`));
+        t.false(file_contents.includes(`table.timestamp('updatedAt');`));
+        t.false(file_contents.includes(`table.index('createdAt');`));
+        t.false(file_contents.includes(`table.index('updatedAt');`));
+        
+        var file_contents = FS.readFileSync(files[1], "utf8");
+        
+        t.true(file_contents.includes(`module.exports = Klein.model('users', {`));
+        t.true(file_contents.includes(`timestamps: false`));
+        t.false(file_contents.includes(`created_at: 'createdAt'`));
+        t.false(file_contents.includes(`updated_at: 'updatedAt'`));
+    });
+});
+
+
 test('It can migrate and roll back', t => {
     const Tasks = require('../tasks');
     

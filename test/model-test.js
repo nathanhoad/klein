@@ -382,3 +382,35 @@ test('It can convert a model to json that has relations on it', t => {
     t.is(json2.hats[0].type, user_with_hats.getIn(['hats', 0, 'type']));
     t.is(json2.hats[0].size, undefined);
 });
+
+
+
+test('It can use alternative timestamps', t => {
+    const Users = Klein.model('users', {
+        timestamps: {
+            created_at: 'createdAt',
+            updated_at: 'updatedAt'
+        }
+    });
+    
+    const Tasks = require('../tasks');
+    
+    process.env.APP_ROOT = '/tmp/klein/alternative-timestamps';
+    FS.removeSync(process.env.APP_ROOT);
+    
+    return Helpers.setupDatabase([
+        ['users', 'name:string']
+    ], { timestamps: { created_at: 'createdAt', updated_at: 'updatedAt' }}).then(() => {
+        return Users.save({
+            name: 'Nathan'
+        });
+    }).then(user => {
+        
+        t.is(user.get('name'), 'Nathan');
+        t.true(user.has('createdAt'));
+        t.false(user.has('created_at'));
+        t.true(user.has('updatedAt'));
+        t.false(user.has('updated_at'));
+        
+    });
+})

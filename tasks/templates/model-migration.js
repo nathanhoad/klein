@@ -4,11 +4,7 @@ module.exports = {
             table.uuid('id').primary();
             {{ADD_COLUMNS}}
             // TODO: add other fields
-            
-            table.timestamps();
             {{INDICES}}
-            table.index('created_at');
-            table.index('updated_at');
         });
     },
 

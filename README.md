@@ -11,6 +11,8 @@ Generate a new model (and migration):
 
 `klein new model NAME [field:type [field:type]]`
 
+...where `type` is anything in the [knex Schema methods](http://knexjs.org/#Schema-Building).
+
 Generate a new migration:
 
 `klein new migration NAME`
@@ -30,6 +32,17 @@ Get the current schema version:
 Get the schema (for a table):
 
 `klein db schema [table]`
+
+You can configure where Klein will put the models and migrations in your `package.json`:
+
+```javascript
+{
+    "klein": {
+        "migrations": "migrations"
+        "models_path": "app/server/models"
+    }
+}
+```
 
 
 ## Usage
@@ -59,7 +72,7 @@ Then you can define a model:
 const Users = Klein.model('users');
 ```
 
-A more full example:
+A bigger example:
 
 ```javascript
 const Users = Klein.model('users', {
@@ -86,13 +99,50 @@ const Users = Klein.model('users', {
 ```
 
 
+#### `created_at` and `updated_at`
+
+If, for some unholy reason, you want to change the names of the `created_at` and `updated_at` automatic fields you can 
+add this to your model:
+
+```javascript
+const Users = Klein.model('users', {
+    timestamps: {
+        created_at: 'createdAt',
+        updated_at: 'updatedAt'
+    }
+});
+```
+
+...or even just turn them off altogether:
+
+```javascript
+const Users = Klein.model('users', {
+    timestamps: false
+});
+```
+
+To have different or disabled timestamps in your migrations you can set them in your `package.json` with either of
+these:
+
+```javascript
+{
+    "klein": {
+        "timestamps": {
+            "created_at": "createdAt",
+            "updated_at": "updatedAt"
+        }
+    }
+}
+```
+
+
 ### Create
 
 ```javascript
 const Users = Klein.model('users');
 
 Users.create({ name: 'Nathan' }).then(user => {
-    user.get('name'); // => Nahtan
+    user.get('name'); // => Nathan
 });
 
 Users.create([{ name: 'Nathan' }, { name: 'Lilly' }]).then(users => {
