@@ -135,6 +135,14 @@ these:
 }
 ```
 
+```javascript
+{
+    "klein": {
+        "timestamps": false
+    }
+}
+```
+
 
 ### Create
 
