@@ -54,5 +54,8 @@ class Klein {
 }
 
 const default_instance = new Klein()
+default_instance.create = () => {
+    return new Klein()
+}
 
 module.exports = default_instance;
