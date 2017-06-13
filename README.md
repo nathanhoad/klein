@@ -267,7 +267,7 @@ Define `relations` on the collection:
 const Users = Klein.model('users', {
     relations: {
         projects: { has_and_belongs_to_many: 'projects' }
-        department: { belongs_to: 'department' }, // assumes department_id
+        department: { belongs_to: 'department' }, // assumes department_id unless otherwise specified
         shirts: { has_many: 'shirts', dependent: true } // deleting this user will delete all of their shirts
     }
 });
@@ -295,6 +295,18 @@ And then retrieve them.
 ```javascript
 Users.include('projects').all().then(users => {
     users.first().get('project');
+});
+```
+
+You can specify the key fields and table if needed:
+
+```javascript
+const Users = Klein.model('users', {
+    relations: {
+        projects: { has_and_belongs_to_many: 'projects', through: 'project_people', primary_key: 'userId', foreign_key: 'projectId'  }
+        department: { belongs_to: 'department', foreign_key: 'departmentId', table: 'department' },
+        shirts: { has_many: 'shirts', dependent: true, foreign_key: 'userId' } 
+    }
 });
 ```
 

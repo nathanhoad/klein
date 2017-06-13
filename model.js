@@ -39,23 +39,23 @@ class Model {
             if (relation.has_and_belongs_to_many) {
                 relation.many = true;
                 relation.type = 'has_and_belongs_to_many';
-                // through table name will always be a combination of the two tables (alpha sorted) joined by a '_'
-                relation.through_table = relation.through_table || [this.table_name, Inflect.pluralize(relation_name)].sort().join('_');
+                // through table name will generally be a combination of the two tables (alpha sorted) joined by a '_'
+                relation.through_table = relation.through || [this.table_name, Inflect.pluralize(relation_name)].sort().join('_');
                 relation.table = relation.table || Inflect.pluralize(relation_name);
-                relation.source_key = relation.source_key || `${Inflect.singularize(this.table_name)}_id`;
-                relation.key = relation.key || `${Inflect.singularize(relation_name)}_id`;
+                relation.source_key = relation.primary_key || `${Inflect.singularize(this.table_name)}_id`;
+                relation.key = relation.foreign_key || `${Inflect.singularize(relation_name)}_id`;
                 relation.dependent = false;
             } else if (relation.belongs_to) {
                 relation.many = false;
                 relation.type = 'belongs_to';
                 relation.table = relation.table || Inflect.pluralize(relation.belongs_to);
-                relation.key = relation.key || `${Inflect.singularize(relation_name)}_id`;
+                relation.key = relation.foreign_key || `${Inflect.singularize(relation_name)}_id`;
                 relation.dependent = false;
             } else if (relation.has_many) {
                 relation.many = true;
                 relation.type = 'has_many';
                 relation.table = relation.table || Inflect.pluralize(relation.has_many);
-                relation.key = relation.key || `${Inflect.singularize(this.table_name)}_id`;
+                relation.key = relation.foreign_key || `${Inflect.singularize(this.table_name)}_id`;
                 relation.dependent = (relation.dependent === true);
             }
             

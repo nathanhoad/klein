@@ -89,6 +89,84 @@ test('It can load belongs_to and has_many relations', t => {
 });
 
 
+test('It can load belongs_to and has_many relations with different keys', t => {
+    const Users = Klein.model('users', {
+        relations: {
+            team: { belongs_to: 'team', foreign_key: 'teamId' }
+        }
+    });
+    const Teams = Klein.model('teams', {
+        relations: {
+            users: { has_many: 'users', foreign_key: 'teamId' }
+        }
+    });
+    
+    process.env.APP_ROOT = '/tmp/klein/belongs-to-with-different-keys';
+    FS.removeSync(process.env.APP_ROOT);
+    
+    const new_teams = [
+        {
+            id: uuid(),
+            name: 'Awesome'
+        },
+        {
+            id: uuid(),
+            name: 'Gamers'
+        }
+    ];
+    
+    const new_users = [
+        {
+            name: 'Nathan', 
+            teamId: new_teams[0].id
+        },
+        {
+            name: 'Lilly',
+            teamId: new_teams[0].id
+        },
+        {
+            name: 'Ben',
+            teamId: new_teams[1].id
+        }
+    ];
+    
+    return Helpers.setupDatabase([
+        ['users', 'name:string', 'teamId:uuid'],
+        ['teams', 'name:string']
+    ]).then(() => {
+        return Users.create(new_users);
+    }).then(users => {
+        return Teams.create(new_teams);
+    }).then(teams => {
+        return Users.include('team').all();
+    }).then(users => {
+        
+        t.is(users.count(), 3);
+        
+        let nathan = users.find(u => u.get('name') == 'Nathan');
+        t.truthy(nathan);
+        t.is(nathan.getIn(['team', 'name']), new_teams[0].name);
+        
+        let lilly = users.find(u => u.get('name') == 'Lilly');
+        t.truthy(lilly);
+        t.is(lilly.getIn(['team', 'name']), new_teams[0].name);
+        
+        let ben = users.find(u => u.get('name') == 'Ben');
+        t.truthy(ben);
+        t.is(ben.getIn(['team', 'name']), new_teams[1].name);
+        
+        return Teams.include('users').all();
+    }).then(teams => {
+        
+        t.is(teams.count(), 2);
+        
+        t.is(teams.find(t => t.get('name') == new_teams[0].name).get('users').count(), 2);
+        t.is(teams.find(t => t.get('name') == new_teams[1].name).get('users').count(), 1);
+        
+    });
+});
+
+
 test('It can load has_and_belongs_to_many relations', t => {
     const Users = Klein.model('users', {
         relations: {
@@ -102,7 +180,7 @@ test('It can load has_and_belongs_to_many relations', t => {
     });
     const ProjectsUsers = Klein.model('projects_users');
     
-    process.env.APP_ROOT = '/tmp/klein/belongs-to';
+    process.env.APP_ROOT = '/tmp/klein/has-and-belongs-to-many';
     FS.removeSync(process.env.APP_ROOT);
     
     const new_projects = [
@@ -158,6 +236,86 @@ test('It can load has_and_belongs_to_many relations', t => {
         return ProjectsUsers.create(new_projects_users);
         
     }).then(projects_users => {
+        
+        return Users.include('projects').all();
+        
+    }).then(users => {
+        
+        t.is(users.count(), 3);
+        
+    });
+});
+
+
+test('It can load has_and_belongs_to_many relations with different keys', t => {
+    const Users = Klein.model('users', {
+        relations: {
+            projects: { has_and_belongs_to_many: 'projects', through: 'memberships', primary_key: 'userId', foreign_key: 'projectId' }
+        }
+    });
+    const Projects = Klein.model('projects', {
+        relations: {
+            users: { has_and_belongs_to_many: 'users', through: 'memberships', primary_key: 'projectId', foreign_key: 'userId' }
+        }
+    });
+    const Memberships = Klein.model('memberships');
+    
+    process.env.APP_ROOT = '/tmp/klein/has-and-belongs-to-many-with-different-keys';
+    FS.removeSync(process.env.APP_ROOT);
+    
+    const new_projects = [
+        {
+            id: uuid(),
+            name: 'Awesome Game'
+        },
+        {
+            id: uuid(),
+            name: 'Design'
+        }
+    ];
+    
+    const new_users = [
+        {
+            name: 'Nathan'
+        },
+        {
+            name: 'Lilly'
+        },
+        {
+            name: 'Ben'
+        }
+    ];
+    
+    const new_memberships = [
+        // Nathan is on Awesome Game
+        { projectId: new_projects[0].id, userId: new_users[0].id },
+        // Nathan is on Design
+        { projectId: new_projects[1].id, userId: new_users[0].id },
+        
+        // Lilly is on Awesome Game
+        { projectId: new_projects[0].id, userId: new_users[1].id },
+        
+        // Ben is on Design
+        { projectId: new_projects[1].id, userId: new_users[2].id }
+    ];
+    
+    return Helpers.setupDatabase([
+        ['users', 'name:string'],
+        ['memberships', 'userId:uuid', 'projectId:uuid'],
+        ['projects', 'name:string']
+    ]).then(() => {
+        
+        return Users.create(new_users);
+        
+    }).then(users => {
+        
+        return Projects.create(new_projects);
+        
+    }).then(projects => {
+        
+        return Memberships.create(new_memberships);
+        
+    }).then(memberships => {
         
         return Users.include('projects').all();
         
