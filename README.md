@@ -50,7 +50,8 @@ You can configure where Klein will put the models and migrations in your `packag
 The easiest init is:
 
 ```javascript
-// Assumes that process.env.DATABASE_URL is set
+// Assumes that process.env.DATABASE_URL is set and automatically connects 
+// to the database
 const Klein = require('klein/auto');
 ```
 
@@ -66,10 +67,26 @@ Or, if you already have an instanciated `knex` object:
 const Klein = require('klein').connect(knex);
 ```
 
-Then you can define a model:
+You can define models before connecting:
 
 ```javascript
+const Klein = require('klein');
 const Users = Klein.model('users');
+```
+
+Be sure to call `.connect()` before using the model:
+
+```javascript
+const Klein = require('klein');
+const Users = Klein.models('users');
+
+// Would throw an error before connecting
+// Users.where({ email: 'test@test.com' });
+
+Klein.connect();
+
+// No errors once connected
+Users.where({ email: 'test@test.com' });
 ```
 
 A bigger example:
