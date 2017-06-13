@@ -6,7 +6,6 @@ const uuid = require('uuid/v4');
 class Model {
     constructor (table_name, args) {
         this.table_name = table_name;
-        this._knex = args.knex;
         this.klein = args.klein;
         this.args = args;
         
@@ -16,12 +15,6 @@ class Model {
             created_at: 'created_at',
             updated_at: 'updated_at'
         }, timestamps);
-        
-        if (args.default_scope) {
-            this.query = args.default_scope;
-        } else {
-            this.query = this._knex(this.table_name).select();
-        }
         
         this.defaults = Object.assign({}, {
             id: this.klein.uuid
@@ -63,15 +56,29 @@ class Model {
         });
     }
     
-    
     knex (table, options) {
+        if (!this.hasKnex()) throw new Error('Klein must be connected (klein.connect()) before a model has access to Knex')
+
         if (options && options.transaction) {
-            return this._knex(table).transacting(options.transaction);
+            return this.klein.knex(table).transacting(options.transaction);
         } else {
-            return this._knex(table);
+            return this.klein.knex(table);
         }
     }
-    
+
+    hasKnex () {
+        return this.klein && this.klein.knex
+    }
+
+    query() {
+        if (!this.hasKnex()) throw new Error('Klein must be connected (klein.connect()) before querying a model')
+        
+        if (this.args.default_scope) {
+            return this.args.default_scope;
+        } else {
+            return this.knex(this.table_name).select();
+        }
+    }
     
     create (properties, options) {
         if (typeof options === "undefined") options = {};
@@ -94,6 +101,8 @@ class Model {
     
     
     destroy (model, options) {
+        if (!this.hasKnex()) throw new Error('Klein must be connected (klein.connect()) before destroying a model')
+
         return new Promise((resolve, reject) => {
             this.knex(this.table_name).where({ id: model.get('id') }).del().then(() => {
                 // Check over dependent has_many (and has_and_belongs_to_many join) relations
@@ -120,6 +129,8 @@ class Model {
     
     
     save (model, options) {
+        if (!this.hasKnex()) throw new Error('Klein must be connected (klein.connect()) before saving a model')
+
         if (typeof options === "undefined") options = {};
         
         let properties = model.toJS ? model.toJS() : Object.assign({}, model);
@@ -186,7 +197,7 @@ class Model {
     
     where () {
         const args = Array.from(arguments);
-        let query = this.query.clone();
+        let query = this.query().clone();
         
         if (args.length == 1) {
             query = query.where(args[0]);
@@ -199,37 +210,37 @@ class Model {
     
     
     whereIn (column, array) {
-        let query = this.query.clone().whereIn(column, array);
+        let query = this.query().clone().whereIn(column, array);
         return this._chain(query);
     }
     
     
     whereNotIn (column, array) {
-        let query = this.query.clone().whereNotIn(column, array);
+        let query = this.query().clone().whereNotIn(column, array);
         return this._chain(query);
     }
     
     
     whereNull (column) {
-        let query = this.query.clone().whereNull(column);
+        let query = this.query().clone().whereNull(column);
         return this._chain(query);
     }
     
     
     whereNotNull (column) {
-        let query = this.query.clone().whereNotNull(column);
+        let query = this.query().clone().whereNotNull(column);
         return this._chain(query);
     }
     
     
     include () {
         this.args._included_relations = Array.from(arguments);
-        return this._chain(this.query.clone());
+        return this._chain(this.query().clone());
     }
     
     
     first (options) {
-        let query = this.query.clone();
+        let query = this.query().clone();
         
         if (options && options.transaction) {
             query = query.transacting(options.transaction);
@@ -248,7 +259,7 @@ class Model {
     
     
     all (options) {
-        let query = this.query.clone();
+        let query = this.query().clone();
         
         if (options && options.transaction) {
             query = query.transacting(options.transaction);
@@ -265,7 +276,7 @@ class Model {
     
     
     delete (options) {
-        let query = this.query.clone();
+        let query = this.query().clone();
         
         if (options && options.transaction) {
             query = query.transacting(options.transaction);
@@ -278,7 +289,7 @@ class Model {
     page (n, per_page) {
         if (typeof per_page === "undefined") per_page = 20;
         
-        let query = this.query.clone().limit(per_page);
+        let query = this.query().clone().limit(per_page);
         
         if (typeof per_page !== "undefined") {
             query = query.offset((n - 1) * per_page);
@@ -290,7 +301,7 @@ class Model {
     
     order () {
         const args = Array.from(arguments);
-        let query = this.query.clone();
+        let query = this.query().clone();
         
         if (args.length == 1) {
             query = query.orderByRaw(args[0]);
@@ -354,7 +365,7 @@ class Model {
     
     
     toString () {
-        return this.query.toString();
+        return this.query().toString();
     }
     
     

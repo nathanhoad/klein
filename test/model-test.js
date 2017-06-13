@@ -8,6 +8,7 @@ Log.silent = true;
 const Helpers = require('./helpers');
 
 const Klein = require('../auto');
+const DisconnectedKlein = Klein.create()
 
 
 test('It can build independent queries', t => {
@@ -37,6 +38,16 @@ test('It can build independent queries', t => {
     const where_not_null = Users.whereNotNull('name').toString();
     t.is(where_not_null, `select * from "users" where "name" is not null`);
 });
+
+test('It throws an error when building independent queries without being connected', t => {
+    const Users = DisconnectedKlein.model('users')
+
+    const expected_error = /Klein must be connected/
+
+    t.throws(() => {
+        Users.where({ email: 'test@test.com'})
+    }, expected_error)
+})
 
 
 test.serial('It can create a new instance', t => {
@@ -116,6 +127,43 @@ test.serial('It can save/restore/destroy an instance', t => {
         });
     });
 });
+
+test('It throws when saving/restoring/destroying instances without being connected', t => {
+    const Lists = DisconnectedKlein.model('lists')
+
+    const expected_error = /Klein must be connected/
+
+    const new_list = {
+        name: 'Todo', 
+        tasks: ['first', 'second', 'third'] 
+    }
+
+    const saved_list = Immutable.Map({
+        id: uuid(),
+        name: 'Todo', 
+        tasks: ['first', 'second', 'third']    
+    })
+
+    t.throws(() => {
+        Lists.create(new_list)
+    }, expected_error)
+
+    t.throws(() => {
+        Lists.find('some-id')
+    }, expected_error)
+
+    t.throws(() => {
+        Lists.save(saved_list)
+    }, expected_error)
+
+    t.throws(() => {
+        Lists.destroy(saved_list)
+    }, expected_error)
+
+    t.throws(() => {
+        Lists.reload(saved_list)
+    }, expected_error)
+})
 
 
 test.serial('It can save/restore a collection', t => {
