@@ -22,6 +22,8 @@ class Klein {
         } else {
             this.knex = database_url_or_knex;
         }
+
+        return this;
     }
     
     model (table_name, args) {
