@@ -60,9 +60,9 @@ class Model {
         if (!this.has_knex()) throw new Error('Klein must be connected (klein.connect()) before a model has access to Knex')
 
         if (options && options.transaction) {
-            return this._knex(table).transacting(options.transaction);
+            return this.klein.knex(table).transacting(options.transaction);
         } else {
-            return this._knex(table);
+            return this.klein.knex(table);
         }
     }
 
