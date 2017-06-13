@@ -57,7 +57,7 @@ class Model {
     }
     
     knex (table, options) {
-        if (!this.has_knex()) throw new Error('Klein must be connected (klein.connect()) before a model has access to Knex')
+        if (!this.hasKnex()) throw new Error('Klein must be connected (klein.connect()) before a model has access to Knex')
 
         if (options && options.transaction) {
             return this.klein.knex(table).transacting(options.transaction);
@@ -66,12 +66,12 @@ class Model {
         }
     }
 
-    has_knex () {
+    hasKnex () {
         return this.klein && this.klein.knex
     }
 
     query() {
-        if (!this.has_knex()) throw new Error('Klein must be connected (klein.connect()) before querying a model')
+        if (!this.hasKnex()) throw new Error('Klein must be connected (klein.connect()) before querying a model')
         
         if (this.args.default_scope) {
             return this.args.default_scope;
@@ -101,7 +101,7 @@ class Model {
     
     
     destroy (model, options) {
-        if (!this.has_knex()) throw new Error('Klein must be connected (klein.connect()) before destroying a model')
+        if (!this.hasKnex()) throw new Error('Klein must be connected (klein.connect()) before destroying a model')
 
         return new Promise((resolve, reject) => {
             this.knex(this.table_name).where({ id: model.get('id') }).del().then(() => {
@@ -129,7 +129,7 @@ class Model {
     
     
     save (model, options) {
-        if (!this.has_knex()) throw new Error('Klein must be connected (klein.connect()) before saving a model')
+        if (!this.hasKnex()) throw new Error('Klein must be connected (klein.connect()) before saving a model')
 
         if (typeof options === "undefined") options = {};
         
