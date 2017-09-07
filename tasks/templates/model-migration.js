@@ -1,6 +1,6 @@
 module.exports = {
-    up (knex, Promise) {
-        return knex.schema.createTable('{{TABLE}}', (table) => {
+    up(knex, Promise) {
+        return knex.schema.createTable('{{TABLE}}', table => {
             table.uuid('id').primary();
             {{ADD_COLUMNS}}
             // TODO: add other fields
@@ -8,8 +8,7 @@ module.exports = {
         });
     },
 
-
-    down (knex, Promise) {
+    down(knex, Promise) {
         return knex.schema.dropTable('{{TABLE}}');
     }
 };

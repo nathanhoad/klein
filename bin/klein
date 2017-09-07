@@ -5,7 +5,7 @@ const Tasks = require('../tasks');
 // Consume 'node' and this scripts name
 const args = process.argv.slice(2, 999);
 
-function task (args) {
+function task(args) {
     switch (args[0]) {
         case 'new':
             if (args[1] === 'migration') {
@@ -16,23 +16,30 @@ function task (args) {
                 return Tasks.unknown(args[0]);
             }
             break;
-            
+
         case 'db':
             switch (args[1]) {
-                case 'migrate': return Tasks.migrate();
-                case 'rollback': return Tasks.rollback();
-                case 'version': return Tasks.version();
+                case 'migrate':
+                    return Tasks.migrate();
+                case 'rollback':
+                    return Tasks.rollback();
+                case 'version':
+                    return Tasks.version();
                 case 'schema':
                 default:
                     return Tasks.schema();
             }
             break;
-            
+
         default:
             return Tasks.unknown(args[0]);
     }
 }
 
-task(args).then(() => {
-    process.exit();
-});
+task(args)
+    .then(() => {
+        process.exit();
+    })
+    .catch(err => {
+        process.exit();
+    });
