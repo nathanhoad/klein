@@ -1,13 +1,13 @@
 module.exports = {
-    up(knex, Promise) {
-        return knex.schema.{{ACTION}}('{{TABLE}}', table => {
-            {{ADD_COLUMNS}}{{INDICES}}
-        });
-    },
+  up(knex, Promise) {
+    return knex.schema.{{ACTION}}('{{TABLE}}', table => {
+      {{ADDCOLUMNS}}{{INDICES}}
+    });
+  },
 
-    down(knex, Promise) {
-        return knex.schema.table('{{TABLE}}', table => {
-            {{DROP_COLUMNS}}
-        });
-    }
+  down(knex, Promise) {
+    return knex.schema.table('{{TABLE}}', table => {
+      {{DROPCOLUMNS}}
+    });
+  }
 };

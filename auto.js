@@ -1,3 +1,1 @@
-const Klein = require('.').connect();
-
-module.exports = Klein;
+module.exports = require('.').connect();
