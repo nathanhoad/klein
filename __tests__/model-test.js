@@ -168,31 +168,6 @@ describe('Instances', () => {
     }
   });
 
-  test('It can create instances with defaults', async () => {
-    const Lists = Klein.model('lists', {
-      defaults: {
-        name: 'Untitled List',
-        tasksCount: properties => {
-          return properties.tasks.length;
-        }
-      }
-    });
-
-    process.env.APP_ROOT = '/tmp/klein/save-and-restore-defaults';
-    FS.removeSync(process.env.APP_ROOT);
-
-    const newList = {
-      tasks: ['first', 'second', 'third']
-    };
-
-    await Helpers.setupDatabase([['list', 'name:string', 'tasks:jsonb', 'tasksCount:integer']], { knex: Klein.knex });
-
-    let list = await Lists.create(newList);
-    list = await Lists.find(list.get('id'));
-    expect(list.get('name')).toBe(Lists.defaults.name);
-    expect(list.get('tasksCount')).toBe(newList.tasks.length);
-  });
-
   test("It can strip out fields that aren't in the table", async () => {
     const Lists = Klein.model('lists', {
       relations: {
@@ -500,5 +475,184 @@ describe('Schema', () => {
     expect(schema.name.maxLength).toBe(255);
 
     expect(schema.tasks.type).toBe('jsonb');
+  });
+});
+
+describe('Hooks', () => {
+  test('It exposes beforeCreate', async () => {
+    const Lists = Klein.model('lists', {
+      hooks: {
+        beforeCreate(model) {
+          return model.set('dueDate', new Date(2017, 0, 1));
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-before-create';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string', 'dueDate:timestamp']], { knex: Klein.knex });
+
+    const list = await Lists.create({ name: 'New List' });
+
+    expect(list.get('dueDate')).not.toBeUndefined();
+    expect(list.get('dueDate')).toBeInstanceOf(Date);
+  });
+
+  test('It exposes beforeSave', async () => {
+    const Lists = Klein.model('lists', {
+      hooks: {
+        beforeSave(model) {
+          return model.set('saveCount', model.get('saveCount', 0) + 1);
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-before-save';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string', 'saveCount:integer']], { knex: Klein.knex });
+
+    let list = await Lists.create({ name: 'New List' });
+
+    expect(list.get('saveCount')).not.toBeUndefined();
+    expect(list.get('saveCount')).toBe(1);
+
+    list = await Lists.save(list);
+
+    expect(list.get('saveCount')).toBe(2);
+  });
+
+  test('It exposes afterCreate', async () => {
+    let value = false;
+    const Lists = Klein.model('lists', {
+      hooks: {
+        afterCreate(model) {
+          value = true;
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-before-save';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string']], { knex: Klein.knex });
+
+    let list = await Lists.create({ name: 'New List' });
+
+    expect(list.get('name')).toBe('New List');
+    expect(value).toBeTruthy();
+  });
+
+  test('It exposes afterSave', async () => {
+    let value = false;
+    const Lists = Klein.model('lists', {
+      hooks: {
+        afterSave(model) {
+          value = true;
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-before-save';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string']], { knex: Klein.knex });
+
+    let list = await Lists.create({ name: 'New List' });
+
+    expect(list.get('name')).toBe('New List');
+    expect(value).toBeTruthy();
+  });
+
+  test('It exposes beforeDestroy', async () => {
+    let value = false;
+    const Lists = Klein.model('lists', {
+      hooks: {
+        beforeDestroy(model) {
+          value = true;
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-before-save';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string']], { knex: Klein.knex });
+
+    let list = await Lists.create({ name: 'New List' });
+    await Lists.destroy(list);
+
+    expect(value).toBeTruthy();
+  });
+
+  test('It exposes afterDestroy', async () => {
+    let value = false;
+    const Lists = Klein.model('lists', {
+      hooks: {
+        afterDestroy(model) {
+          value = true;
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-before-save';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string']], { knex: Klein.knex });
+
+    let list = await Lists.create({ name: 'New List' });
+    await Lists.destroy(list);
+
+    expect(value).toBeTruthy();
+  });
+
+  test('It runs a bunch of hooks', async () => {
+    let beforeCreate = 0;
+    let beforeSave = 0;
+    let afterSave = 0;
+    let afterCreate = 0;
+    let beforeDestroy = 0;
+    let afterDestroy = 0;
+    let order = 1;
+    const Lists = Klein.model('lists', {
+      hooks: {
+        beforeCreate(model) {
+          beforeCreate = order++;
+          return model;
+        },
+        beforeSave(model) {
+          beforeSave = order++;
+          return model;
+        },
+        afterSave() {
+          afterSave = order++;
+        },
+        afterCreate() {
+          afterCreate = order++;
+        },
+        beforeDestroy() {
+          beforeDestroy = order++;
+        },
+        afterDestroy(model) {
+          afterDestroy = order++;
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-before-save';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string']], { knex: Klein.knex });
+
+    let list = await Lists.create({ name: 'New List' });
+    await Lists.destroy(list);
+
+    expect(beforeCreate).toBe(1);
+    expect(beforeSave).toBe(2);
+    expect(afterSave).toBe(3);
+    expect(afterCreate).toBe(4);
+    expect(beforeDestroy).toBe(5);
+    expect(afterDestroy).toBe(6);
   });
 });

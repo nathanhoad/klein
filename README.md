@@ -7,7 +7,6 @@ Models are just Immutable Maps and have no database related instance methods. Al
 
 ## Changes coming in 2.0
 
-* Hooks for `beforeCreate`, `afterCreate`, `beforeSave`, `afterSave`, `beforeDestroy`, `afterDestroy`
 * Validations
 
 
@@ -99,10 +98,10 @@ A bigger example:
 
 ```javascript
 const Users = Klein.model('users', {
-    defaults: {
-        id: Klein.uuid,
-        full_name (properties) {
-            return properties.firstName + ' ' + properties.lastName;
+    hooks: {
+        beforeCreate(user) {
+            user = user.set('fullName', [user.get('firstName'), user.get('lastName')].join(' '));
+            return user;
         }
     },
     relations: {
@@ -115,6 +114,46 @@ const Users = Klein.model('users', {
         derived (user) { // given an Immutable.Map, return an Immutable.Map
             return user.merge({
                 full_name: [user.get('firstName'), user.get('lastName')].join(' ')
+            });
+        }
+    }
+})
+```
+
+
+### Hooks
+
+Models expose a few hooks to help you manage the data going into the database.
+
+Those hooks are (and generally called in this order):
+
+* `beforeCreate` - Called before a model is created. Return 
+* `beforeSave` - Called before a model is saved (including just before it is created)
+* `afterSave` - Called just after a model is saved (including just after it was created)
+* `afterCreate` - Called just after a model is created
+* `beforeDestroy` - Called just before a model is deleted
+* `afterDestroy` - Called just after a model is deleted
+
+Hooks are just functions and take the model (minus any relations) as the first argument.
+
+```javascript
+Klein.model('users', {
+    hooks: {
+        beforeCreate(model) {
+            return model.set('something', 'default value');
+        }
+    }
+})
+```
+
+You can also return a promise:
+
+```javascript
+Klein.model('users', {
+    hooks: {
+        beforeCreate(model) {
+            return getSomeValue().then(value => {
+                return model.set('something', value);
             });
         }
     }
@@ -229,26 +268,6 @@ Users.destroy(user).then(user => {
 ```
 
 Any dependent related records will also be destroyed (see down further in Associations/Relations).
-
-
-## Default values
-
-```javascript
-const Users = Klein.model('users', {
-    defaults: {
-        id: Klein.uuid,
-        fullName (properties) {
-            return properties.firstName + ' ' + properties.lastName;
-        },
-        is_admin: false
-    }
-});
-
-
-Users.create({ firstName: 'Nathan', lastName: 'Hoad' }).then(user => {
-    user.get('fullName'); // Nathan Hoad
-});
-```
 
 
 ## Converting to json

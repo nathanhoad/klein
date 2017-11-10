@@ -25,13 +25,7 @@ class Model {
       timestamps
     );
 
-    this.defaults = Object.assign(
-      {},
-      {
-        id: this.klein.uuid
-      },
-      args.defaults
-    );
+    this.hooks = args.hooks || {};
     this.contexts = args.contexts || {};
 
     this._availableRelations = args._availableRelations || {};
@@ -146,11 +140,15 @@ class Model {
    * Remove a record from the database
    * @async
    * @param {Immutable.Map} model 
-   * @param {*} options 
+   * @param {Object?} options 
    * @returns {Immutable.Map} The now non-persisted record
    */
   async destroy(model, options) {
     if (!this.hasConnection()) throw new Error('Klein must be connected before destroying a model');
+
+    // Run the hook if there is one
+    const shouldDestroy = await this._hook('beforeDestroy', model);
+    if (shouldDestroy === false) return model;
 
     await this.knex(this.tableName)
       .where({ id: model.get('id') })
@@ -161,27 +159,29 @@ class Model {
       .map(k => this._availableRelations[k])
       .filter(r => r.dependent || r.type == 'hasAndBelongsToMany');
 
-    if (dependentRelations.length == 0) return model;
+    if (dependentRelations.length > 0) {
+      await Promise.all(
+        dependentRelations.map(dr => {
+          // if hasAndBelongsToMany then remove rows from the join table
+          const table = dr.type == 'hasAndBelongsToMany' ? dr.throughTable : dr.table;
+          const key = dr.type == 'hasAndBelongsToMany' ? dr.sourceKey : dr.key;
 
-    await Promise.all(
-      dependentRelations.map(dr => {
-        // if hasAndBelongsToMany then remove rows from the join table
-        const table = dr.type == 'hasAndBelongsToMany' ? dr.throughTable : dr.table;
-        const key = dr.type == 'hasAndBelongsToMany' ? dr.sourceKey : dr.key;
+          return this.knex(table, options)
+            .where(key, model.get('id'))
+            .del();
+        })
+      );
+    }
 
-        return this.knex(table, options)
-          .where(key, model.get('id'))
-          .del();
-      })
-    );
+    this._hook('afterDestroy', model);
 
     return model;
   }
 
   /**
    * Persist a record
-   * @param {*} model The hash or Immutable.Map to persist
-   * @param {*} options 
+   * @param {Immutable.Map|Object} model The object or Immutable.Map to persist
+   * @param {Object?} options 
    * @returns {Immutable.Map}
    */
   async save(model, options) {
@@ -214,6 +214,12 @@ class Model {
               return rows.length > 0;
             });
 
+    // Run any applicable hooks
+    if (!exists) {
+      properties = await this._hook('beforeCreate', properties);
+    }
+    properties = await this._hook('beforeSave', properties, exists);
+
     // Strip any uknown fields
     const fields = Object.keys(await this.schema());
     Object.keys(properties).forEach(p => {
@@ -241,13 +247,18 @@ class Model {
     });
     object = await this._saveRelations(object, options);
 
+    this._hook('afterSave', object, exists);
+    if (!exists) {
+      this._hook('afterCreate', object);
+    }
+
     return Immutable.fromJS(object);
   }
 
   /**
    * Find a record by its ID
-   * @param {*} id 
-   * @param {*} options 
+   * @param {String} id A UUID
+   * @param {Object?} options 
    * @returns {Immutable.Map}
    */
   find(id, options) {
@@ -256,8 +267,8 @@ class Model {
 
   /**
    * 
-   * @param {*} model 
-   * @param {*} options 
+   * @param {Immutable.Map} model 
+   * @param {Object?} options 
    */
   reload(model, options) {
     return this.where({ id: model.get('id') }).first(options);
@@ -282,8 +293,8 @@ class Model {
 
   /**
    * Add a WHERE IN clause to the query
-   * @param {*} column The column to match against
-   * @param {*} values The values to match with the column
+   * @param {String} column The column to match against
+   * @param {String} values The values to match with the column
    * @returns {Model}
    */
   whereIn(column, values) {
@@ -295,7 +306,7 @@ class Model {
 
   /**
    * Add a WHERE NOT IN clause to the query
-   * @param {*} column The column to match against
+   * @param {String} column The column to match against
    * @param {Array} values The values to match with the columm
    * @returns {Model}
    */
@@ -308,7 +319,7 @@ class Model {
 
   /**
    * Add a WHERE NULL clause to the query
-   * @param {*} column The column to match against
+   * @param {String} column The column to match against
    */
   whereNull(column) {
     let query = this.query()
@@ -319,7 +330,7 @@ class Model {
 
   /**
    * Add a WHERE NOT NULL clause to the query
-   * @param {*} column 
+   * @param {String} column 
    */
   whereNotNull(column) {
     let query = this.query()
@@ -330,7 +341,6 @@ class Model {
 
   /**
    * Include related models
-   * @param {*}
    */
   include() {
     this.args._includedRelations = Array.from(arguments);
@@ -340,7 +350,7 @@ class Model {
   /**
    * Execute the query and return the first result
    * @param {Object} options 
-   * @returns {*}
+   * @returns {Promise<Immutable.Map>}
    */
   first(options) {
     let query = this.query().clone();
@@ -363,7 +373,7 @@ class Model {
   /**
    * Execute the query and return all results
    * @param {Object} options 
-   * @returns {Promise}
+   * @returns {Promise<Immutable.List>}
    */
   all(options) {
     let query = this.query().clone();
@@ -436,21 +446,21 @@ class Model {
 
   /**
    * Convert an instance or collection to JSON
-   * @param {*} instance_or_list 
-   * @param {*} context 
+   * @param {Imutable.Map|Immutable.List} instanceOrList 
+   * @param {String|Function} context 
    * @returns {Object}
    */
-  json(instance_or_list, context) {
+  json(instanceOrList, context) {
     if (typeof context === 'undefined') context = 'default';
 
     // If a List is given then map over the items
-    if (instance_or_list instanceof Immutable.List || instance_or_list instanceof Array) {
-      const list = instance_or_list.map(instance => this.json(instance, context));
+    if (instanceOrList instanceof Immutable.List || instanceOrList instanceof Array) {
+      const list = instanceOrList.map(instance => this.json(instance, context));
       return list.toJS ? list.toJS() : list;
     }
 
     // If a normal map is given
-    let instance = instance_or_list;
+    let instance = instanceOrList;
 
     // Map the instance depending on the given context
 
@@ -521,20 +531,13 @@ class Model {
   _serialize(model) {
     let properties = model.toJS ? model.toJS() : Object.assign({}, model);
 
-    // Merge with default properties
-    if (typeof properties.id === 'undefined' && typeof this.defaults.id !== 'undefined') {
-      properties.id = this.defaults.id(properties);
-    }
-
-    let defaultValue;
-    Object.keys(this.defaults).forEach(key => {
-      if (key !== 'id' && typeof this.defaults[key] !== 'undefined') {
-        defaultValue = this.defaults[key];
-        if (typeof properties[key] === 'undefined') {
-          properties[key] = typeof defaultValue === 'function' ? defaultValue(properties) : defaultValue;
-        }
+    if (typeof properties.id === 'undefined') {
+      if (typeof this.args.generateId === 'function') {
+        properties.id = this.args.generateId(properties);
+      } else {
+        properties.id = uuid();
       }
-    });
+    }
 
     // Convert any json properties to stringified json
     Object.keys(properties).forEach(key => {
@@ -549,6 +552,34 @@ class Model {
     });
 
     return properties;
+  }
+
+  /**
+   * Run a hook
+   * @param {String} hook The name of the hook to run
+   * @param {Object} properties The current properties
+   * @param {any} extraInfo An extra param to pass to the hook
+   * @returns {Promise<Object>} The updated properties
+   */
+  async _hook(hook, properties, extraInfo) {
+    const hookFn = this.hooks[hook];
+
+    if (typeof hookFn !== 'function') return properties;
+
+    // Convert to Immutable for the hook
+    properties = await hookFn(properties.toJS ? properties : Immutable.fromJS(properties), extraInfo);
+
+    // beforeCreate and beforeSave must return something
+    if (typeof properties !== 'object' && ['beforeSave', 'beforeCreate'].includes(hook)) {
+      throw new Error('beforeCreate and beforeSave hooks must return a model');
+    }
+
+    if (typeof properties === 'object') {
+      // Convert back to raw to give back to the model
+      return properties.toJS ? properties.toJS() : properties;
+    }
+
+    return true;
   }
 
   /**
