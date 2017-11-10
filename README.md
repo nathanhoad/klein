@@ -9,7 +9,6 @@ Models are just Immutable Maps and have no database related instance methods. Al
 
 * Hooks for `beforeCreate`, `afterCreate`, `beforeSave`, `afterSave`, `beforeDestroy`, `afterDestroy`
 * Validations
-* Field names are now camelCased by default
 
 
 ## Migration CLI

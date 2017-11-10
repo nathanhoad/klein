@@ -4,11 +4,11 @@ const uuid = require('uuid/v4');
 
 class Model {
   /**
-     * Create a new model for the given table
-     * @param {string} tableName 
-     * @param {object} args 
-     * @constructor
-     */
+   * Create a new model for the given table
+   * @param {string} tableName 
+   * @param {object} args 
+   * @constructor
+   */
   constructor(tableName, args) {
     this.tableName = tableName;
     this.klein = args.klein;
@@ -86,9 +86,9 @@ class Model {
   }
 
   /**
-     * Check to see if knex has been connected yet
-     * @returns {boolean}
-     */
+   * Check to see if knex has been connected yet
+   * @returns {boolean}
+   */
   hasConnection() {
     return this.klein && this.klein.knex;
   }
@@ -107,9 +107,9 @@ class Model {
   }
 
   /**
-     * Start a new query chain
-     * @returns {knex}
-     */
+   * Start a new query chain
+   * @returns {knex}
+   */
   query() {
     if (!this.hasConnection()) throw new Error('Klein must be connected before querying a model');
 
@@ -492,9 +492,11 @@ class Model {
 
   // INTERNAL HELPERS
 
-  /*
-        Clone the Model with an updated query.
-    */
+  /**
+   * Clone the Model with an updated query
+   * @param {Object} query 
+   * @returns {Model}
+   */
   _chain(query) {
     const args = Object.assign({}, this.args, {
       defaultScope: query
@@ -503,9 +505,11 @@ class Model {
     return new Model(this.tableName, args);
   }
 
-  /*
-        Create a clone of an Immutable Map or JSON Object as a JSON Object with stringified JSON fields
-    */
+  /**
+   * Create a clone of an Immutable Map or JSON Object as a JSON Object with stringified JSON fields
+   * @param {Immutable.Map|Object} model 
+   * @returns {Object}
+   */
   _serialize(model) {
     let properties = model.toJS ? model.toJS() : Object.assign({}, model);
 
@@ -539,6 +543,12 @@ class Model {
     return properties;
   }
 
+  /**
+   * Save any relations on a model
+   * @param {Immutable.Map|Object} model The model that has relations
+   * @param {Object} options 
+   * @returns {Object} The serialized model
+   */
   async _saveRelations(model, options) {
     let properties = model.toJS ? model.toJS() : model;
 
@@ -582,6 +592,13 @@ class Model {
     return properties;
   }
 
+  /**
+   * Save a hasMany relation
+   * @param {Immutable.Map|Object} model The model that has the relation
+   * @param {Object} relation The relation information
+   * @param {Array} relatedObjects The actual related objects
+   * @param {Object} options 
+   */
   async _saveHasManyRelation(model, relation, relatedObjects, options) {
     model = model.toJS ? model.toJS() : model;
 
@@ -621,6 +638,13 @@ class Model {
     };
   }
 
+  /**
+   * Save a belongsTo relation
+   * @param {Immutable.Map|Object} model The model with relation
+   * @param {Object} relation The relationship information
+   * @param {Object} relatedObject The actual related object
+   * @param {Object} options eg. options.transaction
+   */
   async _saveBelongsToRelation(model, relation, relatedObject, options) {
     model = model.toJS ? model.toJS() : model;
 
@@ -640,6 +664,13 @@ class Model {
     };
   }
 
+  /**
+   * Save a hasAndBelongsToMany relationship on this model
+   * @param {Immutable.Map|Object} model The model with relations
+   * @param {Object} relation The relation information
+   * @param {Array} relatedObjects The actual related objects
+   * @param {Object} options eg. options.transaction
+   */
   async _saveHasAndBelongsToManyRelation(model, relation, relatedObjects, options) {
     model = model.toJS ? model.toJS() : model;
 
@@ -701,119 +732,103 @@ class Model {
     };
   }
 
-  /*
-        For each relation requested via `.include` find the related rows and attach them
-        to the matching Model rows
-    */
-  _includeRelations(results, options) {
+  /**
+   * For each relation requested via `.include` find the related rows and attach them to the matching Model rows
+   * @param {Array} results The results from a Knex query
+   * @param {Object} options eg. options.transaction
+   */
+  async _includeRelations(results, options) {
     if (results.length == 0) return Promise.resolve(results);
     if (this._includedRelations.length == 0) return Promise.resolve(results);
 
     let ids = results.map(r => r.id);
-    return Promise.all(
-      this._includedRelations.map(relationName => {
+    const relations = await Promise.all(
+      this._includedRelations.map(async relationName => {
         const relation = this._availableRelations[relationName];
 
         // If there is no relation with that name then throw an error
-        if (typeof relation == 'undefined') return reject(new Error(`'${relationName}' is not a relation`));
+        if (typeof relation == 'undefined') throw new Error(`'${relationName}' is not a relation`);
 
         if (relation.type === 'hasMany') {
-          /*
-                        eg.
-                            Department has many Users
-                    */
-          return this.knex(relation.table, options)
+          // eg.
+          // Department has many Users
+          const relatedRows = (await this.knex(relation.table, options)
             .select('*')
-            .whereIn(relation.key, ids)
-            .then(relatedRows => {
-              relatedRows = relatedRows.map(r => Object.assign({}, r));
-              return { name: relationName, properties: relation, rows: relatedRows };
-            });
+            .whereIn(relation.key, ids)).map(r => Object.assign({}, r));
+          return { name: relationName, properties: relation, rows: relatedRows };
         } else if (relation.type === 'hasAndBelongsToMany') {
-          /*
-                        eg.
-                            User has many Projects (through users_projects)
-                            Project has many Users (through users_projects)
-                    */
-          return this.knex(relation.throughTable, options)
+          // eg.
+          // User has many Projects (through users_projects)
+          // Project has many Users (through users_projects)
+          let throughIds = await this.knex(relation.throughTable, options)
             .select(relation.sourceKey, relation.key)
-            .whereIn(relation.sourceKey, ids)
-            .then(throughIds => {
-              let joins = throughIds.map(r => Object.assign({}, r));
-              throughIds = throughIds.map(r => r[relation.key]);
-              return this.knex(relation.table, options)
-                .select('*')
-                .whereIn('id', throughIds)
-                .then(relatedRows => {
-                  relatedRows = relatedRows.map(r => Object.assign({}, r));
-                  return {
-                    name: relationName,
-                    properties: relation,
-                    joins: joins,
-                    rows: relatedRows
-                  };
-                });
-            });
+            .whereIn(relation.sourceKey, ids);
+          let joins = throughIds.map(r => Object.assign({}, r));
+          throughIds = throughIds.map(r => r[relation.key]);
+          const relatedRows = (await this.knex(relation.table, options)
+            .select('*')
+            .whereIn('id', throughIds)).map(r => Object.assign({}, r));
+          return {
+            name: relationName,
+            properties: relation,
+            joins: joins,
+            rows: relatedRows
+          };
         } else if (relation.type === 'one') {
           // Not sure when this would ever be used
-          return this.knex(relation.table, options)
+          const relatedRows = (await this.knex(relation.table, options)
             .select('*')
             .whereIn(relation.key, ids)
-            .limit(1)
-            .then(relatedRows => {
-              relatedRows = relatedRows.map(r => Object.assign({}, r));
-              return { name: relationName, properties: relation, rows: relatedRows };
-            });
+            .limit(1)).map(r => Object.assign({}, r));
+          return { name: relationName, properties: relation, rows: relatedRows };
         } else if (relation.type === 'belongsTo') {
-          /*
-                        eg.
-                            User belongs to Department
-                            Project belongs to User (eg. created_by_user_id)
-                    */
-          let relation_ids = results.map(r => r[relation.key]);
-          return this.knex(relation.table, options)
+          // eg.
+          // User belongs to Department
+          // Project belongs to User (eg. created_by_user_id)
+          const relationIds = results.map(r => r[relation.key]);
+          const relatedRows = (await this.knex(relation.table, options)
             .select('*')
-            .whereIn('id', relation_ids)
-            .then(relatedRows => {
-              relatedRows = relatedRows.map(r => Object.assign({}, r));
-              return { name: relationName, properties: relation, rows: relatedRows };
-            });
+            .whereIn('id', relationIds)).map(r => Object.assign({}, r));
+          return { name: relationName, properties: relation, rows: relatedRows };
         } else {
           // No matching type?
           return { name: relationName, properties: relation, rows: [] };
         }
       })
-    ).then(relations => {
-      // Graft the relations onto the matching results
-      results = results.map(result => {
-        relations.forEach(relation => {
-          switch (relation.properties.type) {
-            case 'belongsTo':
-              result[relation.name] = relation.rows.find(r => r.id === result[relation.properties.key]);
-              break;
+    );
 
-            case 'hasMany':
-              result[relation.name] = relation.rows.filter(r => r[relation.properties.key] === result.id);
-              break;
+    // Graft the relations onto the matching results
+    return results.map(result => {
+      relations.forEach(relation => {
+        switch (relation.properties.type) {
+          case 'belongsTo':
+            result[relation.name] = relation.rows.find(r => r.id === result[relation.properties.key]);
+            break;
 
-            case 'hasAndBelongsToMany':
-              // Make a list of rows that match up with the result
-              const joinIds = relation.joins
-                ? relation.joins
-                    .filter(j => j[relation.properties.sourceKey] == result.id)
-                    .map(j => j[relation.properties.key])
-                : [];
-              result[relation.name] = relation.rows.filter(r => joinIds.includes(r.id));
-              break;
-          }
-        });
-        return result;
+          case 'hasMany':
+            result[relation.name] = relation.rows.filter(r => r[relation.properties.key] === result.id);
+            break;
+
+          case 'hasAndBelongsToMany':
+            // Make a list of rows that match up with the result
+            const joinIds = relation.joins
+              ? relation.joins
+                  .filter(j => j[relation.properties.sourceKey] == result.id)
+                  .map(j => j[relation.properties.key])
+              : [];
+            result[relation.name] = relation.rows.filter(r => joinIds.includes(r.id));
+            break;
+        }
       });
-
-      return results;
+      return result;
     });
   }
 
+  /**
+   * Update the timestamps 
+   * @param {Object} properties 
+   * @param {String} field 
+   */
   _updateTimestamp(properties, field) {
     if (this.timestampFields[field]) {
       properties[this.timestampFields[field]] = new Date();
