@@ -192,6 +192,36 @@ describe('Instances', () => {
     expect(list.get('name')).toBe(Lists.defaults.name);
     expect(list.get('tasksCount')).toBe(newList.tasks.length);
   });
+
+  test("It can strip out fields that aren't in the table", async () => {
+    const Lists = Klein.model('lists', {
+      relations: {
+        items: { hasMany: 'items' }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/ignore-bad-fields';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string'], ['item', 'task:string', 'listId:uuid']], {
+      knex: Klein.knex
+    });
+
+    const newList = {
+      name: 'This field is in the table',
+      items: [
+        {
+          task: 'This field is in a relation'
+        }
+      ],
+      another: 'This is a bad field'
+    };
+    const list = await Lists.create(newList);
+
+    expect(list.get('name')).toBe(newList.name);
+    expect(list.getIn(['items', 0, 'task'])).toBe(newList.items[0].task);
+    expect(list.get('another')).toBeUndefined();
+  });
 });
 
 describe('Collections', () => {

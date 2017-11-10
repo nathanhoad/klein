@@ -94,7 +94,7 @@ class Model {
   }
 
   /**
-   * Get the schema for the related table (lazy loaded)
+   * Get the schema for the related table (lazy loaded and cached)
    * @async
    * @returns {object} The schema
    */
@@ -213,6 +213,14 @@ class Model {
             .then(rows => {
               return rows.length > 0;
             });
+
+    // Strip any uknown fields
+    const fields = Object.keys(await this.schema());
+    Object.keys(properties).forEach(p => {
+      if (!fields.includes(p)) {
+        delete properties[p];
+      }
+    });
 
     // Save or create the model
     let results;
