@@ -2,15 +2,13 @@ const Immutable = require('immutable');
 const FS = require('fs-extra');
 const uuid = require('uuid/v4');
 
-const Log = require('../log');
-Log.silent = true;
-const Helpers = require('./_helpers');
+const Helpers = require('./__helpers__');
 
 let Klein;
-const DisconnectedKlein = require('../..').create();
+const DisconnectedKlein = require('..').create();
 
 beforeEach(() => {
-  Klein = require('../..')
+  Klein = require('..')
     .create()
     .connect();
 });
@@ -68,12 +66,11 @@ describe('Queries', () => {
 
 describe('Instances', () => {
   test('It can create a new instance', async () => {
-    const Tasks = require('..');
-
     process.env.APP_ROOT = '/tmp/klein/new-instance';
     FS.removeSync(process.env.APP_ROOT);
 
     await Helpers.setupDatabase([['list', 'name:string', 'tasks:jsonb']], { knex: Klein.knex });
+
     const Lists = Klein.model('lists');
 
     const newList = {
@@ -82,13 +79,13 @@ describe('Instances', () => {
     };
 
     let list = await Lists.create(newList);
+
     expect(list.get('name')).toBe(newList.name);
     expect(list.get('tasks').count()).toBe(newList.tasks.length);
   });
 
   test('It can save/restore/destroy an instance', async () => {
     const Lists = Klein.model('lists');
-    const Tasks = require('..');
 
     process.env.APP_ROOT = '/tmp/klein/save-and-restore-instance';
     FS.removeSync(process.env.APP_ROOT);
@@ -181,8 +178,6 @@ describe('Instances', () => {
       }
     });
 
-    const Tasks = require('..');
-
     process.env.APP_ROOT = '/tmp/klein/save-and-restore-defaults';
     FS.removeSync(process.env.APP_ROOT);
 
@@ -202,7 +197,6 @@ describe('Instances', () => {
 describe('Collections', () => {
   test('It can save/restore a collection', async () => {
     const Lists = Klein.model('lists');
-    const Tasks = require('..');
 
     process.env.APP_ROOT = '/tmp/klein/save-and-restore-collection';
     FS.removeSync(process.env.APP_ROOT);
@@ -428,15 +422,17 @@ describe('JSON', () => {
       }
     });
 
-    const Tasks = require('..');
-
     process.env.APP_ROOT = '/tmp/klein/alternative-timestamps';
     FS.removeSync(process.env.APP_ROOT);
+    FS.ensureDirSync(process.env.APP_ROOT);
+    FS.writeFileSync(
+      process.env.APP_ROOT + '/package.json',
+      JSON.stringify({
+        klein: { timestamps: { createdAt: 'created', updatedAt: 'updated' } }
+      })
+    );
 
-    await Helpers.setupDatabase([['users', 'name:string']], {
-      knex: Klein.knex,
-      timestamps: { createdAt: 'created', updatedAt: 'updated' }
-    });
+    await Helpers.setupDatabase([['users', 'name:string']], { knex: Klein.knex });
 
     let user = await Users.save({ name: 'Nathan' });
 

@@ -1,45 +1,24 @@
 #! /usr/bin/env node
 
-const Tasks = require('../tasks');
+const Generate = require('../generate');
+const Schema = require('../schema');
 
-// Consume 'node' and this scripts name
-const args = process.argv.slice(2, 999);
+// Remove `node` and `klein`
+let args = process.argv.slice(2);
 
-function task(args) {
-    switch (args[0]) {
-        case 'new':
-            if (args[1] === 'migration') {
-                return Tasks.newMigration(args.slice(2, 999));
-            } else if (args[1] === 'model') {
-                return Tasks.newModel(args.slice(2, 999));
-            } else {
-                return Tasks.unknown(args[0]);
-            }
-            break;
+const command = args.shift();
+const thing = args.shift();
 
-        case 'db':
-            switch (args[1]) {
-                case 'migrate':
-                    return Tasks.migrate();
-                case 'rollback':
-                    return Tasks.rollback();
-                case 'version':
-                    return Tasks.version();
-                case 'schema':
-                default:
-                    return Tasks.schema();
-            }
-            break;
-
-        default:
-            return Tasks.unknown(args[0]);
-    }
+// klein g model
+// klein g migration
+if (['g', 'generate'].includes(command)) {
+  Generate[thing](args);
 }
 
-task(args)
-    .then(() => {
-        process.exit();
-    })
-    .catch(err => {
-        process.exit();
-    });
+// klein db migrate
+// klein db rollback
+// klein db version
+// klein db schema
+if (['db'].includes(command)) {
+  Schema[thing](args);
+}

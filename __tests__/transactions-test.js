@@ -2,14 +2,12 @@ const Immutable = require('immutable');
 const FS = require('fs-extra');
 const uuid = require('uuid/v4');
 
-const Log = require('../log');
-Log.silent = true;
-const Helpers = require('./_helpers');
+const Helpers = require('./__helpers__');
 
 let Klein;
 
 beforeEach(() => {
-  Klein = require('../..')
+  Klein = require('..')
     .create()
     .connect();
 });

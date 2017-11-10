@@ -2,15 +2,12 @@ const Immutable = require('immutable');
 const FS = require('fs-extra');
 const uuid = require('uuid/v4');
 
-const Log = require('../log');
-Log.silent = true;
-const Helpers = require('./_helpers');
-const Tasks = require('..');
+const Helpers = require('./__helpers__');
 
 let Klein;
 
 beforeEach(() => {
-  Klein = require('../..')
+  Klein = require('..')
     .create()
     .connect();
 });
@@ -142,7 +139,6 @@ test('It can load belongsTo and hasMany relations with different keys', async ()
     knex: Klein.knex
   });
   await Users.create(newUsers);
-
   await Teams.create(newTeams);
 
   let users = await Users.include('team').all();
@@ -164,7 +160,6 @@ test('It can load belongsTo and hasMany relations with different keys', async ()
   let teams = await Teams.include('users').all();
 
   expect(teams.count()).toBe(2);
-
   expect(
     teams
       .find(t => t.get('name') === newTeams[0].name)
