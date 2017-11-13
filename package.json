@@ -7,7 +7,7 @@
     "klein": "bin/klein"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest --runInBand"
   },
   "jest": {
     "testPathIgnorePatterns": ["/node_modules/", "__helpers__.js"]

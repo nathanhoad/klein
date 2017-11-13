@@ -264,7 +264,7 @@ class Schema {
       tableNames = tableNames.filter(t => !t.table_name.includes('schema_migrations'));
     }
 
-    await Promise.all(
+    return Promise.all(
       tableNames.map(t => {
         if (args.includes('--drop')) {
           return config.knexTest.schema.dropTable(t.table_name);

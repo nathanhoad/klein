@@ -224,7 +224,6 @@ describe('Collections', () => {
 
     lists = await Lists.all();
     expect(lists.count()).toBe(2);
-    expect(lists.getIn([1, 'tasks', 0])).toBe(newLists[1].tasks[0]);
   });
 });
 
@@ -497,6 +496,48 @@ describe('Hooks', () => {
 
     expect(list.get('dueDate')).not.toBeUndefined();
     expect(list.get('dueDate')).toBeInstanceOf(Date);
+  });
+
+  test('It throws when beforeCreate fails to return a model', async () => {
+    const Lists = Klein.model('lists', {
+      hooks: {
+        beforeCreate(model) {
+          model = model.set('name', 'some value');
+          // Nothing was returned!?!
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-before-create-throws';
+    FS.removeSync(process.env.APP_ROOT);
+    await Helpers.setupDatabase([['list', 'name:string']], { knex: Klein.knex });
+
+    try {
+      await Lists.create({ name: 'New List' });
+    } catch (ex) {
+      expect(ex.message).toMatch(/must return a model/);
+    }
+  });
+
+  test('It throws when beforeSave fails to return a model', async () => {
+    const Lists = Klein.model('lists', {
+      hooks: {
+        beforeSave(model) {
+          model = model.set('name', 'some value');
+          // Nothing was returned!?!
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-before-save-throws';
+    FS.removeSync(process.env.APP_ROOT);
+    await Helpers.setupDatabase([['list', 'name:string']], { knex: Klein.knex });
+
+    try {
+      await Lists.create({ name: 'New List' });
+    } catch (ex) {
+      expect(ex.message).toMatch(/must return a model/);
+    }
   });
 
   test('It exposes beforeSave', async () => {
