@@ -10,7 +10,7 @@ const Tasks = require('../tasks');
 
 const Klein = require('..').connect();
 
-test('It can load belongs_to and has_many relations', t => {
+test('It can load belongs_to, has_one and has_many relations', t => {
     const Users = Klein.model('users', {
         relations: {
             team: { belongs_to: 'team' }
@@ -18,7 +18,13 @@ test('It can load belongs_to and has_many relations', t => {
     });
     const Teams = Klein.model('teams', {
         relations: {
-            users: { has_many: 'users' }
+            users: { has_many: 'users' },
+            profile: { has_one: 'profile' }
+        }
+    });
+    const Profiles = Klein.model('profiles', {
+        relations: {
+            team: { belongs_to: 'team' }
         }
     });
 
@@ -51,7 +57,18 @@ test('It can load belongs_to and has_many relations', t => {
         }
     ];
 
-    return Helpers.setupDatabase([['users', 'name:string', 'team_id:uuid'], ['teams', 'name:string']])
+    const new_profiles = [
+        {
+            bio: 'We are the best, obviously',
+            team_id: new_teams[0].id
+        },
+        {
+            bio: 'Overcooked is our religion',
+            team_id: new_teams[1].id
+        }
+    ];
+
+    return Helpers.setupDatabase([['users', 'name:string', 'team_id:uuid'], ['teams', 'name:string'], ['profiles', 'bio:string', 'team_id:uuid']])
         .then(() => {
             return Users.create(new_users);
         })
@@ -59,6 +76,9 @@ test('It can load belongs_to and has_many relations', t => {
             return Teams.create(new_teams);
         })
         .then(teams => {
+            return Profiles.create(new_profiles);
+        })
+        .then(profiles => {
             return Users.include('team').all();
         })
         .then(users => {
@@ -94,6 +114,25 @@ test('It can load belongs_to and has_many relations', t => {
                     .get('users')
                     .count(),
                 1
+            );
+
+            return Teams.include('profile').all();
+        })
+        .then(teams => {
+            t.is(teams.count(), 2);
+
+            t.is(
+                teams
+                    .find(t => t.get('name') == new_teams[0].name)
+                    .getIn(['profile', 'bio']),
+                new_profiles[0].bio
+            );
+
+             t.is(
+                teams
+                    .find(t => t.get('name') == new_teams[1].name)
+                    .getIn(['profile', 'bio']),
+                new_profiles[1].bio
             );
         });
 });
