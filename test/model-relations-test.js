@@ -10,7 +10,7 @@ const Tasks = require('../tasks');
 
 const Klein = require('..').connect();
 
-test('It can load belongs_to and has_many relations', t => {
+test('It can load belongs_to, has_one and has_many relations', t => {
     const Users = Klein.model('users', {
         relations: {
             team: { belongs_to: 'team' }
@@ -18,7 +18,13 @@ test('It can load belongs_to and has_many relations', t => {
     });
     const Teams = Klein.model('teams', {
         relations: {
-            users: { has_many: 'users' }
+            users: { has_many: 'users' },
+            profile: { has_one: 'profile' }
+        }
+    });
+    const Profiles = Klein.model('profiles', {
+        relations: {
+            team: { belongs_to: 'team' }
         }
     });
 
@@ -51,7 +57,18 @@ test('It can load belongs_to and has_many relations', t => {
         }
     ];
 
-    return Helpers.setupDatabase([['users', 'name:string', 'team_id:uuid'], ['teams', 'name:string']])
+    const new_profiles = [
+        {
+            bio: 'We are the best, obviously',
+            team_id: new_teams[0].id
+        },
+        {
+            bio: 'Overcooked is our religion',
+            team_id: new_teams[1].id
+        }
+    ];
+
+    return Helpers.setupDatabase([['users', 'name:string', 'team_id:uuid'], ['teams', 'name:string'], ['profiles', 'bio:string', 'team_id:uuid']])
         .then(() => {
             return Users.create(new_users);
         })
@@ -59,6 +76,9 @@ test('It can load belongs_to and has_many relations', t => {
             return Teams.create(new_teams);
         })
         .then(teams => {
+            return Profiles.create(new_profiles);
+        })
+        .then(profiles => {
             return Users.include('team').all();
         })
         .then(users => {
@@ -95,6 +115,25 @@ test('It can load belongs_to and has_many relations', t => {
                     .count(),
                 1
             );
+
+            return Teams.include('profile').all();
+        })
+        .then(teams => {
+            t.is(teams.count(), 2);
+
+            t.is(
+                teams
+                    .find(t => t.get('name') == new_teams[0].name)
+                    .getIn(['profile', 'bio']),
+                new_profiles[0].bio
+            );
+
+             t.is(
+                teams
+                    .find(t => t.get('name') == new_teams[1].name)
+                    .getIn(['profile', 'bio']),
+                new_profiles[1].bio
+            );
         });
 });
 
@@ -106,9 +145,15 @@ test('It can load belongs_to and has_many relations with different keys', t => {
     });
     const Teams = Klein.model('teams', {
         relations: {
-            users: { has_many: 'users', foreign_key: 'teamId' }
+            users: { has_many: 'users', foreign_key: 'teamId' },
+            profile: { has_one: 'profiles', foreign_key: 'teamId' }
         }
     });
+    const Profiles = Klein.model('profiles', {
+        relations: {
+            team: { belongs_to: 'team', foreign_key: 'teamId' }
+        }
+    })
 
     process.env.APP_ROOT = '/tmp/klein/belongs-to-with-different-keys';
     FS.removeSync(process.env.APP_ROOT);
@@ -139,7 +184,18 @@ test('It can load belongs_to and has_many relations with different keys', t => {
         }
     ];
 
-    return Helpers.setupDatabase([['users', 'name:string', 'teamId:uuid'], ['teams', 'name:string']])
+    const new_profiles = [
+        {
+            bio: 'We are the best, obviously',
+            teamId: new_teams[0].id
+        },
+        {
+            bio: 'Overcooked is our religion',
+            teamId: new_teams[1].id
+        }
+    ];
+
+    return Helpers.setupDatabase([['users', 'name:string', 'teamId:uuid'], ['teams', 'name:string'], ['profiles', 'bio:string', 'teamId:uuid']])
         .then(() => {
             return Users.create(new_users);
         })
@@ -147,6 +203,9 @@ test('It can load belongs_to and has_many relations with different keys', t => {
             return Teams.create(new_teams);
         })
         .then(teams => {
+            return Profiles.create(new_profiles);
+        })
+        .then(profiles => {
             return Users.include('team').all();
         })
         .then(users => {
@@ -182,6 +241,25 @@ test('It can load belongs_to and has_many relations with different keys', t => {
                     .get('users')
                     .count(),
                 1
+            );
+
+            return Teams.include('profile').all();
+        })
+        .then(teams => {
+            t.is(teams.count(), 2);
+
+            t.is(
+                teams
+                    .find(t => t.get('name') == new_teams[0].name)
+                    .getIn(['profile', 'bio']),
+                new_profiles[0].bio
+            );
+
+             t.is(
+                teams
+                    .find(t => t.get('name') == new_teams[1].name)
+                    .getIn(['profile', 'bio']),
+                new_profiles[1].bio
             );
         });
 });
@@ -657,13 +735,91 @@ test('It can save an object that has a belongs_to relations on it', t => {
         });
 });
 
+test('It can save an object that has has_one relations on it', t => {
+    const Users = Klein.model('users', {
+        relations: {
+            profile: { has_one: 'profile' }
+        }
+    });
+    const Profiles = Klein.model('profiles', {
+        relations: {
+            user: { belongs_to: 'user' }
+        }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/saving-has-one';
+    FS.removeSync(process.env.APP_ROOT);
+
+    const initial_profile = Immutable.fromJS({
+        bio: 'Working on Awesome Game'
+    });
+
+    const replacement_profile = Immutable.fromJS({
+        bio: 'Working on Design'
+    });
+
+    const new_user = {
+        name: 'Nathan'
+    };
+
+    return Helpers.setupDatabase([['users', 'name:string'], ['profiles', 'bio:string', 'user_id:uuid']])
+        .then(() => {
+            return Users.create(new_user);
+        })
+        .then(user => {
+            // User is nothing initially
+            t.true(typeof user.get('profile') === 'undefined');
+
+            user = user.set('profile', initial_profile);
+
+            return Users.save(user)
+                .then(user => {
+                    t.truthy(user.get('profile'));
+
+                    // Profile was persisted and attached to the project
+                    return Profiles.where({ bio: initial_profile.get('bio') })
+                        .include('user')
+                        .first()
+                        .then((initial_profile) => {
+                            t.is(user.getIn(['profile', 'id']), initial_profile.get('id'));
+                            t.is(initial_profile.getIn(['user', 'id']), user.get('id'));
+
+                            user = user.set('profile', replacement_profile);
+
+                            return Users.save(user).then(user => {
+                                return Profiles.where({ bio: replacement_profile.get('bio') })
+                                    .include('user')
+                                    .first()
+                                    .then(replacement_profile => {
+                                        t.is(user.getIn(['profile', 'id']), replacement_profile.get('id'));
+                                        t.is(replacement_profile.getIn(['user', 'id']), user.get('id'));
+
+                                        // Check that the initial_profile is now empty
+                                        return Profiles.include('user')
+                                            .find(initial_profile.get('id'))
+                                            .then(initial_profile => {
+                                                t.falsy(initial_profile.get('user'));
+                                            });
+                                    });
+                            });
+                        });
+                });
+        });
+});
+
 test('It can destroy dependent objects when destroying the parent', t => {
     const Users = Klein.model('users', {
         relations: {
-            projects: { has_many: 'projects', dependent: true }
+            projects: { has_many: 'projects', dependent: true },
+            profile: { has_one: 'profile', dependent: true }
         }
     });
     const Projects = Klein.model('projects', {
+        relations: {
+            user: { belongs_to: 'user' }
+        }
+    });
+    const Profiles = Klein.model('profiles', {
         relations: {
             user: { belongs_to: 'user' }
         }
@@ -673,23 +829,30 @@ test('It can destroy dependent objects when destroying the parent', t => {
     FS.removeSync(process.env.APP_ROOT);
 
     const new_project = Immutable.fromJS({ id: uuid(), name: 'Awesome Game' });
-    const new_user = Immutable.fromJS({ name: 'Nathan' });
+    let new_user = Immutable.fromJS({ name: 'Nathan' });
+    const new_profile = Immutable.fromJS({ bio: 'Working on Awesome Game '});
 
-    return Helpers.setupDatabase([['users', 'name:string'], ['projects', 'name:string', 'user_id:uuid']])
+    return Helpers.setupDatabase([['users', 'name:string'], ['projects', 'name:string', 'user_id:uuid'], ['profiles', 'bio:string', 'user_id:uuid']])
         .then(() => {
-            return Projects.create(new_project);
+            return Promise.all([
+                Projects.create(new_project),
+                Profiles.create(new_profile)
+            ]);
         })
-        .then(project => {
+        .then(([project, profile]) => {
+            new_user = new_user
+                .set('projects', Immutable.fromJS([project]))
+                .set('profile', profile);
+
             return Users.create(new_user).then(user => {
-                // Add project to user
-                project = project.set('user', user);
-                return Projects.save(project).then(project => {
-                    // Destroy the user (and the dependent project)
-                    return Users.destroy(user).then(user => {
-                        return Projects.reload(project).then(project => {
-                            t.is(project, null);
-                        });
-                    });
+                return Users.destroy(user).then(user => {
+                    return Promise.all([
+                        Projects.reload(project),
+                        Profiles.reload(profile)
+                    ]);
+                }).then(([project, profile]) => {
+                    t.is(project, null);
+                    t.is(profile, null);
                 });
             });
         });

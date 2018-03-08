@@ -58,6 +58,12 @@ class Model {
                 relation.table = relation.table || Inflect.pluralize(relation.has_many);
                 relation.key = relation.foreign_key || `${Inflect.singularize(this.table_name)}_id`;
                 relation.dependent = relation.dependent === true;
+            } else if (relation.has_one) {
+                relation.many = false;
+                relation.type = 'has_one';
+                relation.table = relation.table || Inflect.pluralize(relation.has_one);
+                relation.key = relation.foreign_key || `${Inflect.singularize(this.table_name)}_id`;
+                relation.dependent = relation.dependent === true;
             }
 
             this._available_relations[relation_name] = relation;
@@ -464,6 +470,8 @@ class Model {
                         return this._saveHasManyRelation(model, relation, property_value, options);
                     case 'belongs_to':
                         return this._saveBelongsToRelation(model, relation, property_value, options);
+                    case 'has_one':
+                        return this._saveHasOneRelation(model, relation, property_value, options);
                     case 'has_and_belongs_to_many':
                         return this._saveHasAndBelongsToManyRelation(model, relation, property_value, options);
 
@@ -545,6 +553,43 @@ class Model {
                     };
                 });
         });
+    }
+
+    _saveHasOneRelation(model, relation, related_object, options) {
+        model = model.toJS ? model.toJS() : model;
+
+        // Get or make a Klein Model for the related table
+        const RelatedModel = this.klein.model(relation.table);
+
+        // find any objects that have already been persisted
+        let new_related_objects_ids = [related_object].map(r => r.id).filter(id => id && typeof id !== 'undefined');
+
+        // Unset any objects that have this model as their relation id
+        return this.knex(relation.table, options)
+            .where(relation.key, model.id)
+            .whereNotIn('id', new_related_objects_ids)
+            .update({ [relation.key]: null })
+            .then(() => {
+                // Find any related objects that are already in the database
+                return this.knex(relation.table, options)
+                    .select('id')
+                    .whereIn('id', new_related_objects_ids)
+                    .then(existing_related_ids => {
+                        related_object[relation.key] = model.id;
+                        // save/update the related object (which will then in turn save any relations on itself)
+                        return RelatedModel.save(
+                            related_object,
+                            Object.assign({}, options, {
+                                exists: new_related_objects_ids.includes(related_object.id)
+                            })
+                        );
+                    }).then(saved_related_object => {
+                        return {
+                            name: relation.name,
+                            value: saved_related_object
+                        };
+                    });
+            });
     }
 
     _saveHasAndBelongsToManyRelation(model, relation, related_objects, options) {
@@ -676,12 +721,11 @@ class Model {
                                     };
                                 });
                         });
-                } else if (relation.type === 'one') {
+                } else if (relation.type === 'has_one') {
                     // Not sure when this would ever be used
                     return this.knex(relation.table, options)
                         .select('*')
                         .whereIn(relation.key, ids)
-                        .limit(1)
                         .then(related_rows => {
                             related_rows = related_rows.map(r => Object.assign({}, r));
                             return { name: relation_name, properties: relation, rows: related_rows };
@@ -716,6 +760,10 @@ class Model {
 
                         case 'has_many':
                             result[relation.name] = relation.rows.filter(r => r[relation.properties.key] === result.id);
+                            break;
+
+                        case 'has_one':
+                            result[relation.name] = relation.rows.find(r => r[relation.properties.key] === result.id);
                             break;
 
                         case 'has_and_belongs_to_many':
