@@ -58,6 +58,12 @@ class Model {
                 relation.table = relation.table || Inflect.pluralize(relation.has_many);
                 relation.key = relation.foreign_key || `${Inflect.singularize(this.table_name)}_id`;
                 relation.dependent = relation.dependent === true;
+            } else if (relation.has_one) {
+                relation.many = false;
+                relation.type = 'has_one';
+                relation.table = relation.table || Inflect.pluralize(relation.has_one);
+                relation.key = relation.foreign_key || `${Inflect.singularize(this.table_name)}_id`;
+                relation.dependent = relation.dependent === true;
             }
 
             this._available_relations[relation_name] = relation;
