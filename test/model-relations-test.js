@@ -145,9 +145,15 @@ test('It can load belongs_to and has_many relations with different keys', t => {
     });
     const Teams = Klein.model('teams', {
         relations: {
-            users: { has_many: 'users', foreign_key: 'teamId' }
+            users: { has_many: 'users', foreign_key: 'teamId' },
+            profile: { has_one: 'profiles', foreign_key: 'teamId' }
         }
     });
+    const Profiles = Klein.model('profiles', {
+        relations: {
+            team: { belongs_to: 'team', foreign_key: 'teamId' }
+        }
+    })
 
     process.env.APP_ROOT = '/tmp/klein/belongs-to-with-different-keys';
     FS.removeSync(process.env.APP_ROOT);
@@ -178,7 +184,18 @@ test('It can load belongs_to and has_many relations with different keys', t => {
         }
     ];
 
-    return Helpers.setupDatabase([['users', 'name:string', 'teamId:uuid'], ['teams', 'name:string']])
+    const new_profiles = [
+        {
+            bio: 'We are the best, obviously',
+            teamId: new_teams[0].id
+        },
+        {
+            bio: 'Overcooked is our religion',
+            teamId: new_teams[1].id
+        }
+    ];
+
+    return Helpers.setupDatabase([['users', 'name:string', 'teamId:uuid'], ['teams', 'name:string'], ['profiles', 'bio:string', 'teamId:uuid']])
         .then(() => {
             return Users.create(new_users);
         })
@@ -186,6 +203,9 @@ test('It can load belongs_to and has_many relations with different keys', t => {
             return Teams.create(new_teams);
         })
         .then(teams => {
+            return Profiles.create(new_profiles);
+        })
+        .then(profiles => {
             return Users.include('team').all();
         })
         .then(users => {
@@ -221,6 +241,25 @@ test('It can load belongs_to and has_many relations with different keys', t => {
                     .get('users')
                     .count(),
                 1
+            );
+
+            return Teams.include('profile').all();
+        })
+        .then(teams => {
+            t.is(teams.count(), 2);
+
+            t.is(
+                teams
+                    .find(t => t.get('name') == new_teams[0].name)
+                    .getIn(['profile', 'bio']),
+                new_profiles[0].bio
+            );
+
+             t.is(
+                teams
+                    .find(t => t.get('name') == new_teams[1].name)
+                    .getIn(['profile', 'bio']),
+                new_profiles[1].bio
             );
         });
 });
