@@ -735,6 +735,78 @@ test('It can save an object that has a belongs_to relations on it', t => {
         });
 });
 
+test('It can save an object that has has_one relations on it', t => {
+    const Users = Klein.model('users', {
+        relations: {
+            profile: { has_one: 'profile' }
+        }
+    });
+    const Profiles = Klein.model('profiles', {
+        relations: {
+            user: { belongs_to: 'user' }
+        }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/saving-has-one';
+    FS.removeSync(process.env.APP_ROOT);
+
+    const initial_profile = Immutable.fromJS({
+        bio: 'Working on Awesome Game'
+    });
+
+    const replacement_profile = Immutable.fromJS({
+        bio: 'Working on Design'
+    });
+
+    const new_user = {
+        name: 'Nathan'
+    };
+
+    return Helpers.setupDatabase([['users', 'name:string'], ['profiles', 'bio:string', 'user_id:uuid']])
+        .then(() => {
+            return Users.create(new_user);
+        })
+        .then(user => {
+            // User is nothing initially
+            t.true(typeof user.get('profile') === 'undefined');
+
+            user = user.set('profile', initial_profile);
+
+            return Users.save(user)
+                .then(user => {
+                    t.truthy(user.get('profile'));
+
+                    // Profile was persisted and attached to the project
+                    return Profiles.where({ bio: initial_profile.get('bio') })
+                        .include('user')
+                        .first()
+                        .then((initial_profile) => {
+                            t.is(user.getIn(['profile', 'id']), initial_profile.get('id'));
+                            t.is(initial_profile.getIn(['user', 'id']), user.get('id'));
+
+                            user = user.set('profile', replacement_profile);
+
+                            return Users.save(user).then(user => {
+                                return Profiles.where({ bio: replacement_profile.get('bio') })
+                                    .include('user')
+                                    .first()
+                                    .then(replacement_profile => {
+                                        t.is(user.getIn(['profile', 'id']), replacement_profile.get('id'));
+                                        t.is(replacement_profile.getIn(['user', 'id']), user.get('id'));
+
+                                        // Check that the initial_profile is now empty
+                                        return Profiles.include('user')
+                                            .find(initial_profile.get('id'))
+                                            .then(initial_profile => {
+                                                t.falsy(initial_profile.get('user'));
+                                            });
+                                    });
+                            });
+                        });
+                });
+        });
+});
+
 test('It can destroy dependent objects when destroying the parent', t => {
     const Users = Klein.model('users', {
         relations: {

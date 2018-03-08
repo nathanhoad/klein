@@ -470,6 +470,8 @@ class Model {
                         return this._saveHasManyRelation(model, relation, property_value, options);
                     case 'belongs_to':
                         return this._saveBelongsToRelation(model, relation, property_value, options);
+                    case 'has_one':
+                        return this._saveHasOneRelation(model, relation, property_value, options);
                     case 'has_and_belongs_to_many':
                         return this._saveHasAndBelongsToManyRelation(model, relation, property_value, options);
 
@@ -556,21 +558,38 @@ class Model {
     _saveHasOneRelation(model, relation, related_object, options) {
         model = model.toJS ? model.toJS() : model;
 
+        // Get or make a Klein Model for the related table
         const RelatedModel = this.klein.model(relation.table);
-        return RelatedModel.save(related_object).then(object => {
-            return this.knex(this.table_name, options)
-                .where({ id: model.id })
-                .update({ [relation.key]: object.get('id') })
-                .then(() => {
-                    return {
-                        name: relation.name,
-                        value: object,
-                        // Return with the information to update the current model
-                        belongs_to_key: relation.key,
-                        belongs_to_value: object.get('id')
-                    };
-                });
-        });
+
+        // find any objects that have already been persisted
+        let new_related_objects_ids = [related_object].map(r => r.id).filter(id => id && typeof id !== 'undefined');
+
+        // Unset any objects that have this model as their relation id
+        return this.knex(relation.table, options)
+            .where(relation.key, model.id)
+            .whereNotIn('id', new_related_objects_ids)
+            .update({ [relation.key]: null })
+            .then(() => {
+                // Find any related objects that are already in the database
+                return this.knex(relation.table, options)
+                    .select('id')
+                    .whereIn('id', new_related_objects_ids)
+                    .then(existing_related_ids => {
+                        related_object[relation.key] = model.id;
+                        // save/update the related object (which will then in turn save any relations on itself)
+                        return RelatedModel.save(
+                            related_object,
+                            Object.assign({}, options, {
+                                exists: new_related_objects_ids.includes(related_object.id)
+                            })
+                        );
+                    }).then(saved_related_object => {
+                        return {
+                            name: relation.name,
+                            value: saved_related_object
+                        };
+                    });
+            });
     }
 
     _saveHasAndBelongsToManyRelation(model, relation, related_objects, options) {
