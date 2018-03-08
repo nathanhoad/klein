@@ -810,10 +810,16 @@ test('It can save an object that has has_one relations on it', t => {
 test('It can destroy dependent objects when destroying the parent', t => {
     const Users = Klein.model('users', {
         relations: {
-            projects: { has_many: 'projects', dependent: true }
+            projects: { has_many: 'projects', dependent: true },
+            profile: { has_one: 'profile', dependent: true }
         }
     });
     const Projects = Klein.model('projects', {
+        relations: {
+            user: { belongs_to: 'user' }
+        }
+    });
+    const Profiles = Klein.model('profiles', {
         relations: {
             user: { belongs_to: 'user' }
         }
@@ -823,23 +829,32 @@ test('It can destroy dependent objects when destroying the parent', t => {
     FS.removeSync(process.env.APP_ROOT);
 
     const new_project = Immutable.fromJS({ id: uuid(), name: 'Awesome Game' });
-    const new_user = Immutable.fromJS({ name: 'Nathan' });
+    let new_user = Immutable.fromJS({ name: 'Nathan' });
+    const new_profile = Immutable.fromJS({ bio: 'Working on Awesome Game '});
 
-    return Helpers.setupDatabase([['users', 'name:string'], ['projects', 'name:string', 'user_id:uuid']])
+    return Helpers.setupDatabase([['users', 'name:string'], ['projects', 'name:string', 'user_id:uuid'], ['profiles', 'bio:string', 'user_id:uuid']])
         .then(() => {
-            return Projects.create(new_project);
+            return Promise.all([
+                Projects.create(new_project),
+                Profiles.create(new_profile)
+            ]);
         })
-        .then(project => {
+        .then(([project, profile]) => {
+            new_user = new_user
+                .set('projects', Immutable.fromJS([project]))
+                .set('profile', profile);
+
             return Users.create(new_user).then(user => {
-                // Add project to user
-                project = project.set('user', user);
-                return Projects.save(project).then(project => {
-                    // Destroy the user (and the dependent project)
-                    return Users.destroy(user).then(user => {
-                        return Projects.reload(project).then(project => {
-                            t.is(project, null);
-                        });
-                    });
+                console.log(new_user)
+
+                return Users.destroy(user).then(user => {
+                    return Promise.all([
+                        Projects.reload(project),
+                        Profiles.reload(profile)
+                    ]);
+                }).then(([project, profile]) => {
+                    t.is(project, null);
+                    t.is(profile, null);
                 });
             });
         });
