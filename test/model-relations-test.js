@@ -845,8 +845,6 @@ test('It can destroy dependent objects when destroying the parent', t => {
                 .set('profile', profile);
 
             return Users.create(new_user).then(user => {
-                console.log(new_user)
-
                 return Users.destroy(user).then(user => {
                     return Promise.all([
                         Projects.reload(project),
