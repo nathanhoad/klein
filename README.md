@@ -372,3 +372,9 @@ Klein.transaction(transaction => {
     // Something failed and both User and Hat are now rolled back
 });
 ```
+
+
+## Contributors
+
+* Nathan Hoad - [nathan@nathanhoad.net](mailto:nathan@nathanhoad.net)
+* Jaap van Hardeveld - [jaap@jaaprood.nl](mailto:jaap@jaaprood.nl)

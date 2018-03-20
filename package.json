@@ -22,6 +22,10 @@
     "orm"
   ],
   "author": "Nathan Hoad",
+  "contributors": [
+    "Nathan Hoad <nathan@nathanhoad.net>",
+    "Jaap van Hardeveld <jaap@jaaprood.nl>"
+  ],
   "license": "ISC",
   "homepage": "https://github.com/nathanhoad/klein#readme",
   "repository": {
