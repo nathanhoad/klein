@@ -38,8 +38,8 @@ You can configure where Klein will put the models and migrations in your `packag
 ```javascript
 {
     "klein": {
-        "migrations_path": "migrations"
-        "models_path": "app/server/models"
+        "migrationsPath": "migrations"
+        "modelsPath": "app/server/models"
     }
 }
 ```
@@ -93,22 +93,22 @@ A bigger example:
 
 ```javascript
 const Users = Klein.model('users', {
-    defaults: {
-        id: Klein.uuid,
-        full_name (properties) {
-            return properties.first_name + ' ' + properties.last_name;
+    hooks: {
+        beforeCreate(user) {
+            user = user.set('fullName', [user.get('firstName'), user.get('lastName')].join(' '));
+            return user;
         }
     },
     relations: {
-        projects: { has_and_belongs_to_many: 'projects' }
-        department: { belongs_to: 'department' }, // assumes department_id
+        projects: { hasAndBelongsToMany: 'projects' }
+        department: { belongsTo: 'department' }, // assumes department_id
         shirts: { has_many: 'shirts', dependent: true } // deleting this user will delete all of their shirts
     },
     contexts: {
         simple: ['list', 'of', 'field', 'names'], // only these fields are included in the resulting object
         derived (user) { // given an Immutable.Map, return an Immutable.Map
             return user.merge({
-                full_name: [user.get('first_name'), user.get('last_name')].join(' ')
+                full_name: [user.get('firstName'), user.get('lastName')].join(' ')
             });
         }
     }
@@ -116,16 +116,56 @@ const Users = Klein.model('users', {
 ```
 
 
-#### `created_at` and `updated_at`
+### Hooks
 
-If, for some unholy reason, you want to change the names of the `created_at` and `updated_at` automatic fields you can 
+Models expose a few hooks to help you manage the data going into the database.
+
+Those hooks are (and generally called in this order):
+
+* `beforeCreate` - Called before a model is created. Return 
+* `beforeSave` - Called before a model is saved (including just before it is created)
+* `afterSave` - Called just after a model is saved (including just after it was created)
+* `afterCreate` - Called just after a model is created
+* `beforeDestroy` - Called just before a model is deleted
+* `afterDestroy` - Called just after a model is deleted
+
+Hooks are just functions and take the model (minus any relations) as the first argument.
+
+```javascript
+Klein.model('users', {
+    hooks: {
+        beforeCreate(model) {
+            return model.set('something', 'default value');
+        }
+    }
+})
+```
+
+You can also return a promise:
+
+```javascript
+Klein.model('users', {
+    hooks: {
+        beforeCreate(model) {
+            return getSomeValue().then(value => {
+                return model.set('something', value);
+            });
+        }
+    }
+})
+```
+
+
+#### `createdAt` and `updatedAt`
+
+If you want to change the names of the `createdAt` and `updatedAt` automatic fields you can 
 add this to your model:
 
 ```javascript
 const Users = Klein.model('users', {
     timestamps: {
-        created_at: 'createdAt',
-        updated_at: 'updatedAt'
+        createdAt: 'created_at',
+        updatedAt: 'updated_at'
     }
 });
 ```
@@ -145,8 +185,8 @@ these:
 {
     "klein": {
         "timestamps": {
-            "created_at": "createdAt",
-            "updated_at": "updatedAt"
+            "createdAt": "created_at",
+            "updatedAt": "updated_at"
         }
     }
 }
@@ -205,9 +245,9 @@ Users.all().then(users => {
 ### Persisting
 
 ```javascript
-user = user.set('first_name', 'Nathan');
+user = user.set('firstName', 'Nathan');
 Users.save(user).then(user => {
-    user.get('updated_at'); // Just then
+    user.get('updatedAt'); // Just then
 });
 ```
 
@@ -225,26 +265,6 @@ Users.destroy(user).then(user => {
 Any dependent related records will also be destroyed (see down further in Associations/Relations).
 
 
-## Default values
-
-```javascript
-const Users = Klein.model('users', {
-    defaults: {
-        id: Klein.uuid,
-        full_name (properties) {
-            return properties.first_name + ' ' + properties.last_name;
-        },
-        is_admin: false
-    }
-});
-
-
-Users.create({ first_name: 'Nathan', last_name: 'Hoad' }).then(user => {
-    user.get('full_name'); // Nathan Hoad
-});
-```
-
-
 ## Converting to json
 
 Models can be converted to json and include either all fields or only selected fields based on a context mapper.
@@ -257,7 +277,7 @@ const Users = Klein.model('users', {
         simple: ['list', 'of', 'field', 'names'], // only these fields are included in the resulting object
         derived (user) { // given an Immutable.Map of the instance, return a Map or object
             return user.merge({
-                full_name: [user.get('first_name'), user.get('last_name')].join(' ')
+                fullName: [user.get('firstName'), user.get('lastName')].join(' ')
             });
         }
     }
@@ -283,9 +303,9 @@ Define `relations` on the collection:
 ```javascript
 const Users = Klein.model('users', {
     relations: {
-        projects: { has_and_belongs_to_many: 'projects' }
-        department: { belongs_to: 'department' }, // assumes department_id unless otherwise specified
-        shirts: { has_many: 'shirts', dependent: true } // deleting this user will delete all of their shirts
+        projects: { hasAndBelongsToMany: 'projects' }
+        department: { belongsTo: 'department' }, // assumes departmentId unless otherwise specified
+        shirts: { hasMany: 'shirts', dependent: true } // deleting this user will delete all of their shirts
     }
 });
 ```
@@ -293,17 +313,17 @@ const Users = Klein.model('users', {
 Set them on a model and save them. Anything that hasn't already been saved will be saved.
 
 ```javascript
-let new_project = {
+let newProject = {
     name: 'Some cool project'
 };
 
-let new_user = {
+let newUser = {
     name: 'Nathan',
     projects: [new_project]
 };
 
-Users.create(new_user).then(user => {
-    user.get('projects'); // => Immutable.List [ Immutable.Map of { id, name: 'Some cool project', created_at, updated_at } ]
+Users.create(newUser).then(user => {
+    user.get('projects'); // => Immutable.List [ Immutable.Map of { id, name: 'Some cool project', createdAt, updatedAt } ]
 })
 ```
 
@@ -320,9 +340,9 @@ You can specify the key fields and table if needed:
 ```javascript
 const Users = Klein.model('users', {
     relations: {
-        projects: { has_and_belongs_to_many: 'projects', through: 'project_people', primary_key: 'userId', foreign_key: 'projectId'  }
-        department: { belongs_to: 'department', foreign_key: 'departmentId', table: 'department' },
-        shirts: { has_many: 'shirts', dependent: true, foreign_key: 'userId' } 
+        projects: { hasAndBelongsToMany: 'projects', through: 'project_people', primaryKey: 'userId', foreignKey: 'projectId'  }
+        department: { belongsTo: 'department', foreignKey: 'departmentId', table: 'department' },
+        shirts: { has_many: 'shirts', dependent: true, foreignKey: 'userId' } 
     }
 });
 ```
@@ -352,8 +372,3 @@ Klein.transaction(transaction => {
     // Something failed and both User and Hat are now rolled back
 });
 ```
-
-
-## TODO
-
-* Model validations
