@@ -1,6 +1,7 @@
 const Path = require('path');
 const FS = require('fs-extra');
 const guessRootPath = require('guess-root-path');
+const Inflect = require('i')();
 
 // Convert name:string counter:integer -> table.string('name'), table.integer('counter')
 // Convert add-something-and-other-thing-to-table -> table.string('something'), table.string('otherThing')
