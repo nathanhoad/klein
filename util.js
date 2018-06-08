@@ -60,7 +60,7 @@ function guessTableName(migrationName) {
  * @returns {string} The projects root directory
  */
 async function ensureRootPath() {
-  const root = process.env.APP_ROOT || guessRootPath() + '/tmp';
+  const root = process.env.APP_ROOT || guessRootPath();
   await FS.ensureDir(root);
 
   return root;

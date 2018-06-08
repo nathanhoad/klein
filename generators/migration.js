@@ -3,7 +3,7 @@ const Path = require('path');
 const Inflect = require('i')();
 const Chalk = require('chalk');
 const Prettier = require('prettier');
-const { guessColumns, guessTableName, ensureRootPath } = require('../util');
+const { guessColumns, guessTableName, ensureRootPath, getConfig } = require('../util');
 
 /**
  * Generate a migration
@@ -73,7 +73,7 @@ module.exports = class extends Generator {
     // Copy files
     const migrationFilename = this.destinationPath(`${config.migrationsPath}/${this.options.filename}`);
     this.fs.copyTpl(this.templatePath('migration.js'), migrationFilename, {
-      createTable: false,
+      createTable: this.options.filename.startsWith('create-'),
       tableName: this.options.tableName,
       columns,
       indices
