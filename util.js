@@ -89,7 +89,7 @@ async function getConfig(overrides) {
   // See if there is anything helpful in the package.json
   let packageJson;
   try {
-    packageJson = require(`${rootPath}/package.json`).klein;
+    packageJson = require(`${rootPath}/package.json`).klein || {};
   } catch (ex) {
     packageJson = {};
   }
