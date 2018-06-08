@@ -6,13 +6,13 @@ const Schema = require('../schema');
 // Remove `node` and `klein`
 let args = process.argv.slice(2);
 
-const command = args.shift();
-const thing = args.shift();
+let command = args.shift();
+let thing = args.shift();
 
 // klein g model
 // klein g migration
 if (['g', 'generate'].includes(command)) {
-  Generate[thing](args);
+  command = Generate[thing](args);
 }
 
 // klein db migrate
@@ -20,5 +20,12 @@ if (['g', 'generate'].includes(command)) {
 // klein db version
 // klein db schema
 if (['db'].includes(command)) {
-  Schema[thing](args);
+  command = Schema[thing](args);
+}
+
+// Do the work and then get out
+if (typeof command !== 'string') {
+  command.then(() => {
+    process.exit();
+  });
 }
