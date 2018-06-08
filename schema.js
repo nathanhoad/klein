@@ -1,6 +1,6 @@
+require('dotenv').load({ silent: true });
+
 const Knex = require('knex');
-const Inflect = require('i')();
-const FS = require('fs-extra');
 const { getConfig } = require('./util');
 const Chalk = require('chalk');
 
