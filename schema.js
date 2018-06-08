@@ -80,7 +80,7 @@ class Schema {
     let files = [];
 
     if (results[1].length == 0) {
-      this.log('wait', 'No migrations to run');
+      this.log('wait', null, 'No migrations to run');
     } else {
       results[1].forEach(migrationPath => {
         this.log(Chalk.green, 'migrate', migrationPath.replace(config.options.directory + '/', ''));
