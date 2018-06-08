@@ -86,17 +86,17 @@ class Schema {
         this.log(Chalk.green, 'migrate', migrationPath.replace(config.options.directory + '/', ''));
         files.push(migrationPath);
       });
-    }
 
-    // Run the migration on the test database if there is one
-    if (config.knexTest) {
-      const previousEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'test';
-      results = await config.knexTest.migrate.latest(config.options);
-      process.env.NODE_ENV = previousEnv;
-    }
+      // Run the migration on the test database if there is one
+      if (config.knexTest) {
+        const previousEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'test';
+        results = await config.knexTest.migrate.latest(config.options);
+        process.env.NODE_ENV = previousEnv;
+      }
 
-    this.log('done', null, `Migrated group ${results[0]}`);
+      this.log('done', null, `Migrated group ${results[0]}`);
+    }
 
     return files;
   }
@@ -121,14 +121,14 @@ class Schema {
         this.log(Chalk.yellow, 'rollback', migrationPath.replace(config.options.directory + '/', ''));
         files.push(migrationPath);
       });
-    }
 
-    // Run the same rollback on the test database if there is one
-    if (config.knexTest) {
-      const previousEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'test';
-      results = await config.knexTest.migrate.rollback(config.options);
-      process.env.NODE_ENV = previousEnv;
+      // Run the same rollback on the test database if there is one
+      if (config.knexTest) {
+        const previousEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'test';
+        results = await config.knexTest.migrate.rollback(config.options);
+        process.env.NODE_ENV = previousEnv;
+      }
     }
 
     this.log('done', null, `Rolled back group ${results[0]}`);
