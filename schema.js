@@ -6,7 +6,7 @@ const Chalk = require('chalk');
 
 class Schema {
   constructor(config) {
-    this.config = config;
+    this.config = config || {};
   }
 
   /**
