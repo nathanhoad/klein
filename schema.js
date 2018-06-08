@@ -129,9 +129,9 @@ class Schema {
         results = await config.knexTest.migrate.rollback(config.options);
         process.env.NODE_ENV = previousEnv;
       }
-    }
 
-    this.log('done', null, `Rolled back group ${results[0]}`);
+      this.log('done', null, `Rolled back group ${results[0]}`);
+    }
 
     return files;
   }
