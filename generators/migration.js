@@ -84,7 +84,8 @@ module.exports = class extends Generator {
       Prettier.format(this.fs.read(template), {
         printWidth: 120,
         tabWidth: 2,
-        singleQuote: true
+        singleQuote: true,
+        parser: 'babylon'
       })
     );
   }
