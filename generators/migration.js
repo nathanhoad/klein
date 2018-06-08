@@ -47,19 +47,16 @@ module.exports = class extends Generator {
 
     this.options.tableName = guessTableName(this.options.name);
     if (!this.options.tableName) {
-      this.options.tableName = guessTableName(this.options.name);
-      if (!this.options.tableName) {
-        this.options = Object.assign(
-          {},
-          this.options,
-          await this.prompt({
-            type: 'input',
-            name: 'tableName',
-            message: 'Which table is this migration for?',
-            default: null
-          })
-        );
-      }
+      this.options = Object.assign(
+        {},
+        this.options,
+        await this.prompt({
+          type: 'input',
+          name: 'tableName',
+          message: 'Which table is this migration for?',
+          default: null
+        })
+      );
     }
   }
 
@@ -73,7 +70,7 @@ module.exports = class extends Generator {
     // Copy files
     const migrationFilename = this.destinationPath(`${config.migrationsPath}/${this.options.filename}`);
     this.fs.copyTpl(this.templatePath('migration.js'), migrationFilename, {
-      createTable: this.options.filename.startsWith('create-'),
+      createTable: this.options.name.startsWith('create-'),
       tableName: this.options.tableName,
       columns,
       indices

@@ -47,9 +47,14 @@ function guessColumns(array, string) {
  */
 function guessTableName(migrationName) {
   let tableName = '';
-  let matches = migrationName.match(/^(.*?)-(to|for|on)-(.*?)$/);
-  if (matches && matches.length == 4) {
-    tableName = Inflect.underscore(matches[3]);
+
+  if (migrationName.startsWith('create-')) {
+    tableName = Inflect.underscore(migrationName.replace(/^create-/, ''));
+  } else {
+    let matches = migrationName.match(/^(.*?)-(to|for|on)-(.*?)$/);
+    if (matches && matches.length == 4) {
+      tableName = Inflect.underscore(matches[3]);
+    }
   }
 
   return tableName;
