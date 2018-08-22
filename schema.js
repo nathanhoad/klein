@@ -203,7 +203,7 @@ class Schema {
       };
     });
 
-    return columns;
+    return { table, columns };
   }
 
   /**
@@ -221,14 +221,14 @@ class Schema {
       let schema = await this.schemaForTable(table, config.knex);
       this.log(Chalk.green, 'schema', Chalk.bold(table.toUpperCase()));
       schema.columns.forEach(column => {
-        this.log(Chalk.gray, 'schema', column.name + ': ' + Chalk.yellow(column.type), Chalk.gray(column.meta));
+        this.log(Chalk.gray, '      ', column.name + ': ' + Chalk.yellow(column.type), Chalk.gray(column.meta));
       });
       return [schema];
     } else {
       let queries = (await this.getTableNames(args, config))
         .map(tableName => {
           if (tableName.includes('schema_migrations')) return null;
-          return this.schemaForTable(tableName);
+          return this.schemaForTable(tableName, config.knex);
         })
         .filter(q => q);
 
@@ -236,10 +236,10 @@ class Schema {
       schemas.forEach((schema, index) => {
         this.log(Chalk.green, 'schema', Chalk.bold(schema.table.toUpperCase()));
         schema.columns.forEach(column => {
-          this.log(Chalk.gray, 'schema', column.name + ': ' + Chalk.yellow(column.type), Chalk.gray(column.meta));
+          this.log(Chalk.gray, '      ', column.name + ': ' + Chalk.yellow(column.type), Chalk.gray(column.meta));
         });
         if (index < schemas.length - 1) {
-          this.log('');
+          this.log(Chalk.gray, '', '');
         }
       });
 
