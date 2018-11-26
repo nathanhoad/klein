@@ -84,31 +84,6 @@ describe('Instances', () => {
     expect(list.get('tasks').count()).toBe(newList.tasks.length);
   });
 
-  test('It can create a custom new instance through a custom factory', async () => {
-    process.env.APP_ROOT = '/tmp/klein/new-instance-custom-factory';
-    FS.removeSync(process.env.APP_ROOT);
-
-    await Helpers.setupDatabase([['list', 'name:string', 'tasks:jsonb']], { knex: Klein.knex });
-
-    const customInstance = Immutable.Map({ something: 'else' })
-
-    const newList = {
-      name: 'Todo',
-      tasks: ['first', 'second', 'third']
-    };
-
-    const Lists = Klein.model('lists', { 
-      factory: (instance) => {
-        expect(instance.get('name')).toBe(newList.name);
-        return customInstance;
-      }
-    });
-
-    let list = await Lists.create(newList);
-
-    expect(customInstance.equals(list)).toBe(true);
-  });
-
   test('It can save/restore/destroy an instance', async () => {
     const Lists = Klein.model('lists');
 
@@ -145,51 +120,6 @@ describe('Instances', () => {
     list = await Lists.reload(deletedList);
     expect(list).toBeNull();
   });
-
-  test('It can save/restore/destroy a custom instance', async () => {
-    process.env.APP_ROOT = '/tmp/klein/save-and-restore-custom-instance';
-    FS.removeSync(process.env.APP_ROOT);
-
-    const newList = {
-      name: 'Todo',
-      tasks: ['first', 'second', 'third']
-    };
-
-    const Lists = Klein.model('lists', { 
-      factory: (instance) => {
-        return instance.set('__typeName', 'list');
-      },
-      serialize: (customInstance) => {
-        return customInstance.remove('__typeName').toJS()
-      },
-      instanceOf: (maybeInstance) => {
-        return maybeInstance && maybeInstance.toJS && maybeInstance.get('__typeName') === 'list';
-      }
-    });
-
-    await Helpers.setupDatabase([['list', 'name:string', 'tasks:jsonb']], { knex: Klein.knex });
-
-    let list = await Lists.create(newList);
-
-    list = await Lists.find(list.get('id'));
-    expect(list.get('__typeName')).toBe('list');
-
-    list = list.set('name', 'New Name');
-    list = list.set('tasks', list.get('tasks').push('fourth'));
-    list = await Lists.save(list);
-    
-    list = await Lists.where({ name: 'New Name' }).first();
-
-    expect(list.get('name')).toBe('New Name');
-    expect(list.get('tasks').count()).toBe(newList.tasks.length + 1);
-    expect(list.get('tasks').last()).toBe('fourth');
-    expect(list.get('__typeName')).toBe('list');
-
-    let deletedList = await Lists.destroy(list);
-
-    list = await Lists.reload(deletedList);
-    expect(list).toBeNull();
-  })
 
   test('It throws when saving/restoring/destroying instances without being connected', async () => {
     const Lists = DisconnectedKlein.model('lists');
