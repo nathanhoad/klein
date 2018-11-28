@@ -548,7 +548,7 @@ test('It can save an object that has hasMany relations on it', async () => {
   user = user.set('projects', newProjects);
   user = await Users.save(user);
 
-  expect(user.get('projects').count()).toBe(2);
+  expect(user.get('projects').filter((project) => project.get('id')).count()).toBe(2);
 
   // Add the third, already saved project
   user = user.set('projects', user.get('projects').push(project));
