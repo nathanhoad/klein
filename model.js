@@ -664,7 +664,8 @@ class Model {
     // Find any related objects that are already in the database
     let existingRelatedObjectIds = await this.knex(relation.table, options)
       .select('id')
-      .whereIn('id', newRelatedObjectsIds);
+      .whereIn('id', newRelatedObjectsIds)
+      .then((results) => results.map((result) => result.id));
 
     const savedRelatedObjects = await Promise.all(
       relatedObjects.map(relatedObject => {
@@ -673,7 +674,7 @@ class Model {
         return RelatedModel.save(
           relatedObject,
           Object.assign({}, options, {
-            exists: newRelatedObjectsIds.includes(relatedObject.id)
+            exists: existingRelatedObjectIds.includes(relatedObject.id)
           })
         );
       })
