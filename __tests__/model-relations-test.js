@@ -695,6 +695,14 @@ test('It can save an object that has a belongsTo relations on it', async () => {
   // Check that the initialUser projects is now empty
   initialUser = await Users.include('projects').find(initialUser.get('id'));
   expect(initialUser.get('projects').count()).toBe(0);
+
+  project = project.set('user', null);
+  project = await Projects.save(project);
+  replacementUser = await Users.where({ name: replacementUser.get('name') })
+    .include('projects')
+    .first();
+  expect(project.get('user')).toBe(null);
+  expect(replacementUser.get('projects').count()).toBe(0);
 });
 
 test('It can destroy dependent objects when destroying the parent', async () => {

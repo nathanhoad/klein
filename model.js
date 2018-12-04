@@ -696,19 +696,25 @@ class Model {
   async _saveBelongsToRelation(model, relation, relatedObject, options) {
     model = model.toJS ? model.toJS() : model;
 
-    const RelatedModel = this.klein.model(relation.table);
-    const object = await RelatedModel.save(relatedObject);
+    var foreignValue
+
+    if (relatedObject) {
+      let RelatedModel = this.klein.model(relation.table);
+      foreignValue = await RelatedModel.save(relatedObject);
+    } else {
+      foreignValue = null
+    }
 
     await this.knex(this.tableName, options)
       .where({ id: model.id })
-      .update({ [relation.key]: object.get('id') });
+      .update({ [relation.key]: foreignValue && foreignValue.get('id') });
 
     return {
       name: relation.name,
-      value: object,
+      value: foreignValue,
       // Return with the information to update the current model
       belongsToKey: relation.key,
-      belongsToValue: object.get('id')
+      belongsToValue: foreignValue && foreignValue.get('id')
     };
   }
 
