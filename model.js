@@ -696,13 +696,13 @@ class Model {
   async _saveBelongsToRelation(model, relation, relatedObject, options) {
     model = model.toJS ? model.toJS() : model;
 
-    var foreignValue
+    var foreignValue;
 
     if (relatedObject) {
       let RelatedModel = this.klein.model(relation.table);
       foreignValue = await RelatedModel.save(relatedObject);
     } else {
-      foreignValue = null
+      foreignValue = null;
     }
 
     await this.knex(this.tableName, options)
