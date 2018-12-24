@@ -621,7 +621,7 @@ class Model {
     if (typeof hookFn !== 'function') return properties;
 
     // Convert to Immutable for the hook
-    properties = await hookFn(properties.toJS ? properties : Immutable.fromJS(properties), extraInfo);
+    properties = await hookFn(this._instanceOf(properties) ? properties : this._factory(properties), extraInfo);
 
     // beforeCreate and beforeSave must return something
     if (typeof properties !== 'object' && ['beforeSave', 'beforeCreate'].includes(hook)) {
@@ -630,7 +630,7 @@ class Model {
 
     if (typeof properties === 'object') {
       // Convert back to raw to give back to the model
-      return properties.toJS ? properties.toJS() : properties;
+      return this._serialize(properties);
     }
 
     return true;

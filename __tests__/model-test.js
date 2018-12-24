@@ -766,4 +766,31 @@ describe('Hooks', () => {
     expect(beforeDestroy).toBe(5);
     expect(afterDestroy).toBe(6);
   });
+
+  test('It is compatible with custom types', async () => {
+    const Lists = Klein.model('lists', {
+      factory: (instance) => {
+        return Immutable.Map({ custom: true, wrapped: Immutable.fromJS(instance) })
+      },
+      serialize: (instance) => {
+        return instance.get('wrapped').toJS()
+      },
+      hooks: {
+        beforeCreate(model) {
+          expect(model.get('custom')).toBeTruthy()
+          return model.setIn(['wrapped', 'dueDate'], new Date(2017, 0, 1));
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-custom-types';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string', 'dueDate:timestamp']], { knex: Klein.knex });
+
+    const list = await Lists.create({ name: 'New List' });
+
+    expect(list.getIn(['wrapped', 'dueDate'])).not.toBeUndefined();
+    expect(list.getIn(['wrapped', 'dueDate'])).toBeInstanceOf(Date);
+  });
 });
