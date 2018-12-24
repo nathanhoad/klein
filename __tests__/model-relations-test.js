@@ -628,6 +628,85 @@ test('It can save an object that has a hasOne relation on it', async () => {
   expect(profile.get('user')).toBeFalsy();
 });
 
+test('It can save an object that has a hasOne relation on it for model with custom instance', async () => {
+  const testType = (name) => ({
+    factory(props) {
+      return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+    },
+    instanceOf(maybeInstance) {
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+    },
+    serialize(instance) {
+      return instance.get('wrapped').toObject();
+    }
+  });
+
+  const Users = Klein.model('users', {
+    type: testType('user'),
+    relations: {
+      profile: { hasOne: 'profile' }
+    }
+  });
+  const Profiles = Klein.model('profiles', {
+    type: testType('profile'),
+    relations: {
+      user: { belongsTo: 'user' }
+    }
+  });
+
+  process.env.APP_ROOT = '/tmp/klein/save-has-one';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const initialProfile = Immutable.fromJS({
+    type: 'profile',
+    wrapped: {
+      bio: 'Working on Awesome Game'
+    }
+  });
+
+  const replacementProfile = Immutable.fromJS({
+    type: 'profile',
+    wrapped: {
+      bio: 'Working on Design'
+    }
+  });
+
+  const newUser = {
+    name: 'Nathan'
+  };
+
+  await Helpers.setupDatabase([['users', 'name:string'], ['profiles', 'bio:string', 'userId:uuid']], {
+    knex: Klein.knex
+  });
+
+  let user = await Users.create(newUser);
+
+  expect(typeof user.getIn(['wrapped', 'profile'])).toBe('undefined');
+
+  user = user.setIn(['wrapped', 'profile'], initialProfile);
+  user = await Users.save(user);
+
+  expect(user.getIn(['wrapped', 'profile'])).toBeTruthy();
+
+  let profile = await Profiles.where({ bio: initialProfile.getIn(['wrapped', 'bio']) })
+    .include('user')
+    .first();
+  expect(user.getIn(['wrapped', 'profile', 'wrapped', 'id'])).toBe(profile.getIn(['wrapped', 'id']));
+  expect(profile.getIn(['wrapped', 'user', 'wrapped', 'id'])).toBe(user.getIn(['wrapped', 'id']));
+
+  user = user.setIn(['wrapped', 'profile'], replacementProfile);
+  user = await Users.save(user);
+
+  let otherProfile = await Profiles.where({ bio: replacementProfile.getIn(['wrapped', 'bio']) })
+    .include('user')
+    .first();
+  expect(user.getIn(['wrapped', 'profile', 'wrapped', 'id'])).toBe(otherProfile.getIn(['wrapped', 'id']));
+  expect(otherProfile.getIn(['wrapped', 'user', 'wrapped', 'id'])).toBe(user.getIn(['wrapped', 'id']));
+
+  profile = await Profiles.include('user').find(profile.getIn(['wrapped', 'id']));
+  expect(profile.getIn(['wrapped', 'user', 'wrapped'])).toBeFalsy();
+});
+
 test('It can save an object that has hasAndBelongsToMany relations on it', async () => {
   const Users = Klein.model('users', {
     relations: {

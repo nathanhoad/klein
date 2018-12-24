@@ -846,6 +846,7 @@ class Model {
 
     // Get or make a Klein model for the related table
     const RelatedModel = this.klein.model(relation.table);
+    relatedObject = RelatedModel._serialize(relatedObject);
 
     // find any objects that have already been persisted
     let newRelatedObjectsIds = [relatedObject].map(r => r.id).filter(id => id && typeof id !== 'undefined');
