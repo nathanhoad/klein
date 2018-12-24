@@ -551,14 +551,18 @@ class Model {
    * @return {Object}
    */
   _serialize(model) {
-    if (!this._instanceOf(model)) return model;
-
-    if (this.args.type && typeof this.args.type.serialize === 'function') {
-      let result = this.args.type.serialize(model);
+    const verifyResult = (result) => {
       if (!_isPlainObject(result)) {
         throw new Error(`serialize of '${this.tableName}' Klein.model must return a plain object`);
       }
       return result;
+    }
+    
+    if (!this._instanceOf(model)) return verifyResult(model);
+
+    if (this.args.type && typeof this.args.type.serialize === 'function') {
+      let result = this.args.type.serialize(model);
+      return verifyResult(result);
     } else {
       return model.toJS();
     }
