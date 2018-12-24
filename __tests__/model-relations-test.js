@@ -307,6 +307,7 @@ test('It can load belongsTo, hasOne, and hasMany relations for model with custom
       knex: Klein.knex
     }
   );
+  await Users.create(newUsers);
 
   let teams = await Teams.create(newTeams);
   let profiles = await Profiles.create(newProfiles);
@@ -486,6 +487,86 @@ test('It can load hasAndBelongsToMany relations with different keys', async () =
 
   let users = await Users.include('projects').all();
   expect(users.count()).toBe(3);
+});
+
+test('It can load hasAndBelongsToMany relations for model with custom instances', async () => {
+  const testType = (name) => ({
+    factory(props) {
+      return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+    },
+    instanceOf(maybeInstance) {
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+    },
+    serialize(instance) {
+      return instance.get('wrapped').toObject();
+    }
+  });
+
+  const Users = Klein.model('users', {
+    type: testType('user'),
+    relations: {
+      projects: { hasAndBelongsToMany: 'projects' }
+    }
+  });
+  const Projects = Klein.model('projects', {
+    type: testType('project'),
+    relations: {
+      users: { hasAndBelongsToMany: 'users' }
+    }
+  });
+  const ProjectsUsers = Klein.model('projects_users');
+
+  process.env.APP_ROOT = '/tmp/klein/has-and-belongs-to-many';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const newProjects = [
+    {
+      id: uuid(),
+      name: 'Awesome Game'
+    },
+    {
+      id: uuid(),
+      name: 'Design'
+    }
+  ];
+
+  const newUsers = [
+    {
+      name: 'Nathan'
+    },
+    {
+      name: 'Lilly'
+    },
+    {
+      name: 'Ben'
+    }
+  ];
+
+  const NewProjectsUsers = [
+    // Nathan is on Awesome Game
+    { projectId: newProjects[0].id, userId: newUsers[0].id },
+    // Nathan is on Design
+    { projectId: newProjects[1].id, userId: newUsers[0].id },
+
+    // Lilly is on Awesome Game
+    { projectId: newProjects[0].id, userId: newUsers[1].id },
+
+    // Ben is on Design
+    { projectId: newProjects[1].id, userId: newUsers[2].id }
+  ];
+
+  await Helpers.setupDatabase(
+    [['users', 'name:string'], ['projects_users', 'userId:uuid', 'projectId:uuid'], ['projects', 'name:string']],
+    { knex: Klein.knex }
+  );
+
+  await Users.create(newUsers);
+  await Projects.create(newProjects);
+  await ProjectsUsers.create(NewProjectsUsers);
+
+  let users = await Users.include('projects').all();
+  expect(users.count()).toBe(3);
+  expect(users.first().get('type')).toBe('user');
 });
 
 test('It can save an object that has a hasOne relation on it', async () => {
