@@ -538,8 +538,8 @@ class Model {
   _factory(properties) {
     const immutable = Immutable.fromJS(properties);
     
-    if (typeof this.args.factory === 'function') {
-      return this.args.factory(immutable);
+    if (this.args.type && typeof this.args.type.factory === 'function') {
+      return this.args.type.factory(immutable);
     } else {
       return immutable;
     }
@@ -553,8 +553,8 @@ class Model {
   _serialize(model) {
     if (!this._instanceOf(model)) return model;
 
-    if (typeof this.args.serialize === 'function') {
-      let result = this.args.serialize(model);
+    if (this.args.type && typeof this.args.type.serialize === 'function') {
+      let result = this.args.type.serialize(model);
       if (!_isPlainObject(result)) {
         throw new Error(`serialize of '${this.tableName}' Klein.model must return a plain object`);
       }
@@ -570,8 +570,8 @@ class Model {
    * @return {boolean}
    */
   _instanceOf(maybeModel) {
-    if (typeof this.args.instanceOf === 'function') {
-      return !!this.args.instanceOf(maybeModel);
+    if (this.args.type && typeof this.args.type.instanceOf === 'function') {
+      return !!this.args.type.instanceOf(maybeModel);
     } else {
       return !!maybeModel.toJS;
     }

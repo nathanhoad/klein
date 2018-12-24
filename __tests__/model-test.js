@@ -84,7 +84,7 @@ describe('Instances', () => {
     expect(list.get('tasks').count()).toBe(newList.tasks.length);
   });
 
-  test('It can create a custom new instance through a custom factory', async () => {
+  test('It can create a custom new instance through a custom type factory', async () => {
     process.env.APP_ROOT = '/tmp/klein/new-instance-custom-factory';
     FS.removeSync(process.env.APP_ROOT);
 
@@ -98,9 +98,11 @@ describe('Instances', () => {
     };
 
     const Lists = Klein.model('lists', { 
-      factory: (instance) => {
-        expect(instance.get('name')).toBe(newList.name);
-        return customInstance;
+      type: {
+        factory: (instance) => {
+          expect(instance.get('name')).toBe(newList.name);
+          return customInstance;
+        }
       }
     });
 
@@ -146,7 +148,7 @@ describe('Instances', () => {
     expect(list).toBeNull();
   });
 
-  test('It can save/restore/destroy a custom instance', async () => {
+  test('It can save/restore/destroy an instance of custom type', async () => {
     process.env.APP_ROOT = '/tmp/klein/save-and-restore-custom-instance';
     FS.removeSync(process.env.APP_ROOT);
 
@@ -155,15 +157,17 @@ describe('Instances', () => {
       tasks: ['first', 'second', 'third']
     };
 
-    const Lists = Klein.model('lists', { 
-      factory: (instance) => {
-        return instance.set('__typeName', 'list');
-      },
-      serialize: (customInstance) => {
-        return customInstance.remove('__typeName').toJS()
-      },
-      instanceOf: (maybeInstance) => {
-        return maybeInstance && maybeInstance.toJS && maybeInstance.get('__typeName') === 'list';
+    const Lists = Klein.model('lists', {
+      type: {
+        factory: (instance) => {
+          return instance.set('__typeName', 'list');
+        },
+        serialize: (customInstance) => {
+          return customInstance.remove('__typeName').toJS()
+        },
+        instanceOf: (maybeInstance) => {
+          return maybeInstance && maybeInstance.toJS && maybeInstance.get('__typeName') === 'list';
+        }
       }
     });
 
@@ -769,11 +773,13 @@ describe('Hooks', () => {
 
   test('It is compatible with custom types', async () => {
     const Lists = Klein.model('lists', {
-      factory: (instance) => {
-        return Immutable.Map({ custom: true, wrapped: Immutable.fromJS(instance) })
-      },
-      serialize: (instance) => {
-        return instance.get('wrapped').toJS()
+      type: {
+        factory: (instance) => {
+          return Immutable.Map({ custom: true, wrapped: Immutable.fromJS(instance) })
+        },
+        serialize: (instance) => {
+          return instance.get('wrapped').toJS()
+        }
       },
       hooks: {
         beforeCreate(model) {
