@@ -393,7 +393,7 @@ class Model {
       results = results.map(r => Object.assign({}, r));
 
       return this._includeRelations(results, options).then(results => {
-        return this._factory(results);
+        return Immutable.List(results.map((r) => this._factory(r)));
       });
     });
   }

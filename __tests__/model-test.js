@@ -299,6 +299,45 @@ describe('Collections', () => {
     lists = await Lists.all();
     expect(lists.count()).toBe(2);
   });
+
+  test('It can save/restore a collection', async () => {
+    const testType = (name) => ({
+      factory(props) {
+        return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+      },
+      instanceOf(maybeInstance) {
+        return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+      },
+      serialize(instance) {
+        return instance.get('wrapped').toJS();
+      }
+    });
+    const Lists = Klein.model('lists', { type: testType('list') });
+
+    process.env.APP_ROOT = '/tmp/klein/save-and-restore-collection';
+    FS.removeSync(process.env.APP_ROOT);
+
+    const newLists = [
+      {
+        name: 'Todo',
+        tasks: ['first', 'second', 'third']
+      },
+      {
+        name: 'Done',
+        tasks: ['one', 'two']
+      }
+    ];
+
+    await Helpers.setupDatabase([['lists', 'name:string', 'tasks:jsonb']], { knex: Klein.knex });
+
+    let lists = await Lists.create(newLists);
+    expect(Immutable.List.isList(lists)).toBeTruthy();
+    expect(lists.getIn([0, 'type'])).toBe('list');
+    expect(lists.getIn([0, 'wrapped', 'name'])).toBe(newLists[0].name);
+
+    lists = await Lists.all();
+    expect(lists.count()).toBe(2);
+  });
 });
 
 describe('JSON', () => {
