@@ -227,6 +227,127 @@ test('It can load belongsTo, hasOne, and hasMany relations with different keys',
   expect(teams.find(t => t.get('name') == newTeams[1].name).getIn(['profile', 'bio'])).toBe(newProfiles[1].bio);
 });
 
+test('It can load belongsTo, hasOne, and hasMany relations for model with custom instances', async () => {
+  const testType = (name) => ({
+    factory(props) {
+      return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+    },
+    instanceOf(maybeInstance) {
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+    },
+    serialize(instance) {
+      return instance.get('wrapped').toJS();
+    }
+  });
+
+  const Users = Klein.model('users', {
+    type: testType('user'),
+    relations: {
+      team: { belongsTo: 'team' }
+    }
+  });
+  const Teams = Klein.model('teams', {
+    type: testType('team'),
+    relations: {
+      users: { hasMany: 'users' },
+      profile: { hasOne: 'profile' }
+    }
+  });
+  const Profiles = Klein.model('profiles', {
+    type: testType('profile'),
+
+    relations: {
+      team: { belongsTo: 'team' }
+    }
+  });
+
+  process.env.APP_ROOT = '/tmp/klein/relations-load-custom-types';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const newTeams = [
+    {
+      id: uuid(),
+      name: 'Awesome'
+    },
+    {
+      id: uuid(),
+      name: 'Gamers'
+    }
+  ];
+
+  const newUsers = [
+    {
+      name: 'Nathan',
+      teamId: newTeams[0].id
+    },
+    {
+      name: 'Lilly',
+      teamId: newTeams[0].id
+    },
+    {
+      name: 'Ben',
+      teamId: newTeams[1].id
+    }
+  ];
+
+  const newProfiles = [
+    {
+      bio: 'We are the best, obviously',
+      teamId: newTeams[0].id
+    },
+    {
+      bio: 'Overcooked is our religion',
+      teamId: newTeams[1].id
+    }
+  ];
+
+  await Helpers.setupDatabase(
+    [['users', 'name:string', 'teamId:uuid'], ['teams', 'name:string'], ['profiles', 'bio:string', 'teamId:uuid']],
+    {
+      knex: Klein.knex
+    }
+  );
+
+  let teams = await Teams.create(newTeams);
+  let profiles = await Profiles.create(newProfiles);
+  let users = await Users.include('team').all();
+
+  expect(users.count()).toBe(3);
+
+  let nathan = users.find(u => u.getIn(['wrapped', 'name']) === 'Nathan');
+  expect(nathan).toBeTruthy();
+  expect(nathan.getIn(['wrapped', 'team', 'wrapped', 'name'])).toBe(newTeams[0].name);
+
+  let lilly = users.find(u => u.getIn(['wrapped', 'name']) === 'Lilly');
+  expect(lilly).toBeTruthy();
+  expect(lilly.getIn(['wrapped', 'team', 'wrapped', 'name'])).toBe(newTeams[0].name);
+
+  let ben = users.find(u => u.getIn(['wrapped', 'name']) === 'Ben');
+  expect(ben).toBeTruthy();
+  expect(ben.getIn(['wrapped', 'team', 'wrapped', 'name'])).toBe(newTeams[1].name);
+
+  teams = await Teams.include('users').all();
+  expect(teams.count()).toBe(2);
+  expect(
+    teams
+      .find(t => t.getIn(['wrapped', 'name']) === newTeams[0].name)
+      .getIn(['wrapped', 'users'])
+      .count()
+  ).toBe(2);
+  expect(
+    teams
+      .find(t => t.getIn(['wrapped','name']) === newTeams[1].name)
+      .getIn(['wrapped', 'users'])
+      .count()
+  ).toBe(1);
+
+  teams = await Teams.include('profile').all();
+
+  expect(teams.count()).toBe(2);
+  expect(teams.find(t => t.getIn(['wrapped', 'name']) == newTeams[0].name).getIn(['wrapped', 'profile', 'wrapped', 'bio'])).toBe(newProfiles[0].bio);
+  expect(teams.find(t => t.getIn(['wrapped', 'name']) == newTeams[1].name).getIn(['wrapped', 'profile', 'wrapped', 'bio'])).toBe(newProfiles[1].bio);
+});
+
 test('It can load hasAndBelongsToMany relations', async () => {
   const Users = Klein.model('users', {
     relations: {

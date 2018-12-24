@@ -890,6 +890,7 @@ class Model {
     const relations = await Promise.all(
       this._includedRelations.map(async relationName => {
         const relation = this._availableRelations[relationName];
+        const model = this.klein.model(relation.table)
 
         // If there is no relation with that name then throw an error
         if (typeof relation == 'undefined') throw new Error(`'${relationName}' is not a relation`);
@@ -900,7 +901,7 @@ class Model {
           const relatedRows = (await this.knex(relation.table, options)
             .select('*')
             .whereIn(relation.key, ids)).map(r => Object.assign({}, r));
-          return { name: relationName, properties: relation, rows: relatedRows };
+          return { name: relationName, properties: relation, rows: relatedRows, model: model };
         } else if (relation.type === 'hasAndBelongsToMany') {
           // eg.
           // User has many Projects (through users_projects)
@@ -917,7 +918,8 @@ class Model {
             name: relationName,
             properties: relation,
             joins: joins,
-            rows: relatedRows
+            rows: relatedRows,
+            model: model
           };
         } else if (relation.type === 'hasOne') {
           // Not sure when this would ever be used
@@ -925,7 +927,7 @@ class Model {
             .select('*')
             .whereIn(relation.key, ids)
             .map(r => Object.assign({}, r));
-          return { name: relationName, properties: relation, rows: relatedRows };
+          return { name: relationName, properties: relation, rows: relatedRows, model: model };
         } else if (relation.type === 'belongsTo') {
           // eg.
           // User belongs to Department
@@ -934,10 +936,10 @@ class Model {
           const relatedRows = (await this.knex(relation.table, options)
             .select('*')
             .whereIn('id', relationIds)).map(r => Object.assign({}, r));
-          return { name: relationName, properties: relation, rows: relatedRows };
+          return { name: relationName, properties: relation, rows: relatedRows, model: model };
         } else {
           // No matching type?
-          return { name: relationName, properties: relation, rows: [] };
+          return { name: relationName, properties: relation, rows: [], model: model };
         }
       })
     );
@@ -947,15 +949,21 @@ class Model {
       relations.forEach(relation => {
         switch (relation.properties.type) {
           case 'belongsTo':
-            result[relation.name] = relation.rows.find(r => r.id === result[relation.properties.key]);
+            result[relation.name] = relation.model._factory(
+              relation.rows.find(r => r.id === result[relation.properties.key])
+            );
             break;
 
           case 'hasMany':
-            result[relation.name] = relation.rows.filter(r => r[relation.properties.key] === result.id);
+            result[relation.name] = relation.rows
+              .filter(r => r[relation.properties.key] === result.id)
+              .map(r => relation.model._factory(r))
             break;
 
           case 'hasOne':
-            result[relation.name] = relation.rows.find(r => r[relation.properties.key] === result.id);
+            result[relation.name] = relation.model._factory(
+              relation.rows.find(r => r[relation.properties.key] === result.id)
+            );
             break;
 
           case 'hasAndBelongsToMany':
@@ -965,7 +973,9 @@ class Model {
                   .filter(j => j[relation.properties.sourceKey] == result.id)
                   .map(j => j[relation.properties.key])
               : [];
-            result[relation.name] = relation.rows.filter(r => joinIds.includes(r.id));
+            result[relation.name] = relation.rows
+              .filter(r => joinIds.includes(r.id))
+              .map(r => relation.model._factory(r));
             break;
         }
       });
