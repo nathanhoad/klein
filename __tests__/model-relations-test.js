@@ -785,6 +785,108 @@ test('It can save an object that has hasAndBelongsToMany relations on it', async
   expect(projectsUsers.count()).toBe(3);
 });
 
+test('It can save an object that has hasAndBelongsToMany relations on it for model with custom instance', async () => {
+  const testType = (name) => ({
+    factory(props) {
+      return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+    },
+    instanceOf(maybeInstance) {
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+    },
+    serialize(instance) {
+      return instance.get('wrapped').toObject();
+    }
+  });
+
+  const Users = Klein.model('users', {
+    type: testType('user'),
+    relations: {
+      projects: { hasAndBelongsToMany: 'projects' }
+    }
+  });
+  const Projects = Klein.model('projects', {
+    type: testType('project'),
+    relations: {
+      users: { hasAndBelongsToMany: 'users' }
+    }
+  });
+  const ProjectsUsers = Klein.model('projects_users');
+
+  process.env.APP_ROOT = '/tmp/klein/save-has-and-belongs-to-many';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const newProjects = Immutable.fromJS([
+    {
+      type: 'project',
+      wrapped: {
+        name: 'Awesome Game'
+      }
+    },
+    {
+      type: 'project',
+      wrapped: {
+        id: uuid(),
+        name: 'Design'
+      }
+    }
+  ]);
+
+  const persistedProject = Immutable.fromJS({
+    type: 'project',
+    wrapped: {
+      name: 'Persisted'
+    }
+  });
+
+  const newUser = {
+    name: 'Nathan'
+  };
+
+  await Helpers.setupDatabase(
+    [['users', 'name:string'], ['projects_users', 'userId:uuid', 'projectId:uuid'], ['projects', 'name:string']],
+    { knex: Klein.knex }
+  );
+
+  let project = await Projects.create(persistedProject);
+  let user = await Users.create(newUser);
+
+  // Add the first two unsaved projects
+  user = user.setIn(['wrapped', 'projects'], newProjects);
+  user = await Users.save(user);
+  expect(user.getIn(['wrapped', 'projects']).count()).toBe(2);
+  expect(user.getIn(['wrapped', 'projects']).first().get('type')).toBe('project')
+
+  // Add the third, already saved project
+  user = user.setIn(['wrapped', 'projects'], user.getIn(['wrapped', 'projects']).push(project));
+  user = await Users.save(user);
+
+  expect(user.getIn(['wrapped', 'projects']).count()).toBe(3);
+  expect(user.getIn(['wrapped', 'projects']).find(p => p.getIn(['wrapped', 'id']) === project.getIn(['wrapped', 'id']))).not.toBeNull();
+
+  let users = await Users.include('projects').all();
+
+  expect(
+    users
+      .first()
+      .getIn(['wrapped', 'projects'])
+      .count()
+  ).toBe(3);
+
+  project = users
+    .first()
+    .getIn(['wrapped', 'projects'])
+    .find(p => p.getIn(['wrapped', 'name']) === newProjects.first().getIn(['wrapped', 'name']));
+
+  expect(typeof project.getIn(['wrapped', 'id']) !== 'undefined').toBeTruthy();
+
+  // Make sure subsequent saves don't add duplicates
+  user = await Users.save(users.first());
+  expect(user.getIn(['wrapped', 'projects']).count()).toBe(3);
+
+  let projectsUsers = await ProjectsUsers.all();
+  expect(projectsUsers.count()).toBe(3);
+});
+
 test('It can save an object that has hasMany relations on it', async () => {
   const Users = Klein.model('users', {
     relations: {

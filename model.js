@@ -774,13 +774,15 @@ class Model {
    * Save a hasAndBelongsToMany relationship on this model
    * @param {Immutable.Map|Object} model The model with relations
    * @param {Object} relation The relation information
-   * @param {Array} relatedObjects The actual related objects
+   * @param {Array|Immutable.List} relatedObjects The actual related objects
    * @param {Object} options eg. options.transaction
    */
   async _saveHasAndBelongsToManyRelation(model, relation, relatedObjects, options) {
     model = this._serialize(model);
 
     const RelatedModel = this.klein.model(relation.table);
+    relatedObjects = relatedObjects.map(r => RelatedModel._serialize(r));
+    if (Immutable.List.isList(relatedObjects)) relatedObjects = relatedObjects.toArray()
 
     // eg. Users.save(user) where user.has('projects')
     // relation_ids would be project_ids
@@ -816,11 +818,12 @@ class Model {
           })
         );
 
+        const relatedId = RelatedModel._serialize(relatedModel).id
         // See if we need to insert a new join row
-        if (!existingRelatedObjectIds.includes(relatedModel.get('id'))) {
+        if (!existingRelatedObjectIds.includes(relatedId)) {
           const newJoinRow = {
             id: uuid(),
-            [relation.key]: relatedModel.get('id'),
+            [relation.key]: relatedId,
             [relation.sourceKey]: model.id
           };
           this._updateTimestamp(newJoinRow, 'updatedAt');
@@ -828,7 +831,7 @@ class Model {
           await this.knex(relation.throughTable, options).insert(newJoinRow, 'id');
         }
 
-        return relatedObject;
+        return relatedModel;
       })
     );
 
