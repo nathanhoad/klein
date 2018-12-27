@@ -1,0 +1,10 @@
+language: node_js
+node_js:
+  - "node"
+  - "lts/*"
+services:
+  - postgresql
+before_script:
+  - psql -c 'create database klein_test;' -U postgres
+env:
+  - DATABASE_URL=postgres://localhost:5432/klein_test?user=postgres
