@@ -532,9 +532,10 @@ class Model {
     const context = !options.context ? null :
       options.context instanceof Function ? options.context :
       this.contexts[options.context]
+    const contextName = options.context && typeof options.context === 'string' ? options.context : null
 
     if (this.args.type && typeof this.args.type.serialize === 'function') {
-      let result = this.args.type.serialize(model, { ...options, context });
+      let result = this.args.type.serialize(model, { ...options, context, contextName });
       return verifyResult(result);
     }
 

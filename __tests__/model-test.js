@@ -569,7 +569,11 @@ describe('JSON', () => {
         return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
       },
       serialize(instance, options) {
-        return instance.get('wrapped').set('context', options && options.context).toObject();
+        return instance.get('wrapped')
+          // note: we can't use merge here, as it will cast arrays and objects to be Immutable
+          .set('context', options && options.context)
+          .set('contextName', options && options.contextName)
+          .toObject();
       }
     });
 
@@ -616,19 +620,24 @@ describe('JSON', () => {
     const json1 = Users.json(user, 'special')
     expect(json1.context).toBe(specialContext)
     expect(json1.isSpecial).toBeUndefined()
+    expect(json1.contextName).toEqual('special')
 
     const json2 = Users.json(user, specialContext)
     expect(json2.context).toBe(specialContext)
+    expect(json2.contextName).toBeNull()
 
     const json3 = Users.json(user, 'simple')
     expect(json3.context).toEqual(['firstName', 'lastName'])
+    expect(json3.contextName).toEqual('simple')
 
     const json4 = Users.json(user, 'everything')
     expect(json4.context).toEqual('*')
+    expect(json4.contextName).toEqual('everything')
 
     const json5 = Hats.json(hat, 'simple')
     expect(json5.type).toEqual(hat.get('type'))
     expect(json5.user.context).toEqual(['firstName', 'lastName'])
+    expect(json5.user.contextName).toEqual('simple')
   })
 });
 
