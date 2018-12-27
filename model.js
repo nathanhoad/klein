@@ -703,6 +703,8 @@ class Model {
 
     // Get or make a Klein Model for the related table
     const RelatedModel = this.klein.model(relation.table);
+    relatedObjects = relatedObjects.map(r => RelatedModel._serialize(r));
+    if (Immutable.List.isList(relatedObjects)) relatedObjects = relatedObjects.toArray()
 
     // find any objects that have already been persisted
     let newRelatedObjectsIds = relatedObjects.map(r => r.id).filter(id => id && typeof id !== 'undefined');
@@ -747,26 +749,28 @@ class Model {
    */
   async _saveBelongsToRelation(model, relation, relatedObject, options) {
     model = this._serialize(model);
+    const RelatedModel = this.klein.model(relation.table);
 
     var foreignValue;
 
     if (relatedObject) {
-      let RelatedModel = this.klein.model(relation.table);
       foreignValue = await RelatedModel.save(relatedObject);
     } else {
       foreignValue = null;
     }
 
+    const foreignId = foreignValue && RelatedModel._serialize(foreignValue).id
+
     await this.knex(this.tableName, options)
       .where({ id: model.id })
-      .update({ [relation.key]: foreignValue && foreignValue.get('id') });
+      .update({ [relation.key]: foreignId });
 
     return {
       name: relation.name,
       value: foreignValue,
       // Return with the information to update the current model
       belongsToKey: relation.key,
-      belongsToValue: foreignValue && foreignValue.get('id')
+      belongsToValue: foreignId
     };
   }
 
