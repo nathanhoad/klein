@@ -560,7 +560,7 @@ describe('JSON', () => {
     expect(user.has('updatedAt')).toBeFalsy();
   });
 
-  test('It defers the context to the custom type of a model', () => {
+  test('It defers the rendering of the context to the custom type of a model', () => {
     const testType = (name) => ({
       factory(props) {
         return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
@@ -588,6 +588,15 @@ describe('JSON', () => {
       }
     });
 
+    const Hats = Klein.model('hats', {
+      contexts: {
+        simple: ['type', 'user']
+      },
+      relations: {
+        user: { belongsTo: 'users' }
+      }
+    });
+
     const user = Immutable.fromJS({
       type: 'user',
       wrapped: {
@@ -598,12 +607,28 @@ describe('JSON', () => {
       }
     });
 
+    const hat = Immutable.fromJS({
+      type: 'cowboy',
+      size: 'L',
+      user: user
+    })
+
     const json1 = Users.json(user, 'special')
-    expect(json1.context).toBe('special')
+    expect(json1.context).toBe(specialContext)
     expect(json1.isSpecial).toBeUndefined()
 
     const json2 = Users.json(user, specialContext)
     expect(json2.context).toBe(specialContext)
+
+    const json3 = Users.json(user, 'simple')
+    expect(json3.context).toEqual(['firstName', 'lastName'])
+
+    const json4 = Users.json(user, 'everything')
+    expect(json4.context).toEqual('*')
+
+    const json5 = Hats.json(hat, 'simple')
+    expect(json5.type).toEqual(hat.get('type'))
+    expect(json5.user.context).toEqual(['firstName', 'lastName'])
   })
 });
 

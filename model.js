@@ -528,45 +528,43 @@ class Model {
     
     if (!this._instanceOf(model)) return verifyResult(model);
 
+    // resolve context, so that however we serialize, it can be taken into account
+    const context = !options.context ? null :
+      options.context instanceof Function ? options.context :
+      this.contexts[options.context]
+
     if (this.args.type && typeof this.args.type.serialize === 'function') {
-      let result = this.args.type.serialize(model, options);
+      let result = this.args.type.serialize(model, { ...options, context });
       return verifyResult(result);
     }
 
+    // The context defined on the model is a function
+    if (context instanceof Function) {
+      model = context(model);
 
-    if (options.context instanceof Function) {
-      model = options.context(model);
-    } else {
-      const context_mapper = this.contexts[options.context];
+      // The context defined on the model is a list of fields
+    } else if (context instanceof Array) {
+      if (context.length > 0 && context[0] !== '*') {
+        // Add any requested fields to the new contextualised object
+        let newInstance = Immutable.Map();
+        context.forEach(key => {
+          if (!model.has(key)) return;
 
-      // The context defined on the model is a function
-      if (context_mapper instanceof Function) {
-        model = context_mapper(model);
+          // If its a relation check to see if the relation has the same context
+          if (Object.keys(this._availableRelations).includes(key)) {
+            const RelatedModel = this.klein.model(this._availableRelations[key].table);
+            newInstance = newInstance.set(key, RelatedModel.json(model.get(key), options.context));
 
-        // The context defined on the model is a list of fields
-      } else if (context_mapper instanceof Array) {
-        if (context_mapper.length > 0 && context_mapper[0] !== '*') {
-          // Add any requested fields to the new contextualised object
-          let newInstance = Immutable.Map();
-          context_mapper.forEach(key => {
-            if (!model.has(key)) return;
-
-            // If its a relation check to see if the relation has the same context
-            if (Object.keys(this._availableRelations).includes(key)) {
-              const RelatedModel = this.klein.model(this._availableRelations[key].table);
-              newInstance = newInstance.set(key, RelatedModel.json(model.get(key), options.context));
-
-              // Just add normal fields
-            } else {
-              newInstance = newInstance.set(key, model.get(key));
-            }
-          });
-          model = newInstance;
-        }
+            // Just add normal fields
+          } else {
+            newInstance = newInstance.set(key, model.get(key));
+          }
+        });
+        model = newInstance;
       }
     }
 
-    return model.toJS()
+    return model.toJS ? model.toJS() : model
   }
 
   /**
