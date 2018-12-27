@@ -461,50 +461,15 @@ class Model {
     if (typeof context === 'undefined') context = 'default';
 
     // If a List is given then map over the items
-    if (instanceOrList instanceof Immutable.List || instanceOrList instanceof Array) {
+    if (Immutable.List.isList(instanceOrList) || instanceOrList instanceof Array) {
       const list = instanceOrList.map(instance => this.json(instance, context));
-      return list.toJS ? list.toJS() : list;
+      return list.toArray ? list.toArray() : list;
     }
 
     // If a normal map is given
     let instance = instanceOrList;
 
-    // Map the instance depending on the given context
-
-    // Given a literal function as the context
-    if (context instanceof Function) {
-      instance = context(instance);
-    } else {
-      const context_mapper = this.contexts[context];
-
-      // The context defined on the model is a function
-      if (context_mapper instanceof Function) {
-        instance = context_mapper(instance);
-
-        // The context defined on the model is a list of fields
-      } else if (context_mapper instanceof Array) {
-        if (context_mapper.length > 0 && context_mapper[0] !== '*') {
-          // Add any requested fields to the new contextualised object
-          let newInstance = Immutable.Map();
-          context_mapper.forEach(key => {
-            if (!instance.has(key)) return;
-
-            // If its a relation check to see if the relation has the same context
-            if (Object.keys(this._availableRelations).includes(key)) {
-              const RelatedModel = this.klein.model(this._availableRelations[key].table);
-              newInstance = newInstance.set(key, RelatedModel.json(instance.get(key), context));
-
-              // Just add normal fields
-            } else {
-              newInstance = newInstance.set(key, instance.get(key));
-            }
-          });
-          instance = newInstance;
-        }
-      }
-    }
-
-    return instance.toJS ? instance.toJS() : instance;
+    return this._serialize(instance, { context })
   }
 
   /**
@@ -548,9 +513,12 @@ class Model {
   /**
    * Serialize model to plain object
    * @param {Model|Object}
+   * @param {Object?} options
    * @return {Object}
    */
-  _serialize(model) {
+  _serialize(model, options) {
+    if (typeof options === 'undefined') options = {};
+
     const verifyResult = (result) => {
       if (!_isPlainObject(result)) {
         throw new Error(`serialize of '${this.tableName}' Klein.model must return a plain object`);
@@ -561,11 +529,44 @@ class Model {
     if (!this._instanceOf(model)) return verifyResult(model);
 
     if (this.args.type && typeof this.args.type.serialize === 'function') {
-      let result = this.args.type.serialize(model);
+      let result = this.args.type.serialize(model, options);
       return verifyResult(result);
-    } else {
-      return model.toJS();
     }
+
+
+    if (options.context instanceof Function) {
+      model = options.context(model);
+    } else {
+      const context_mapper = this.contexts[options.context];
+
+      // The context defined on the model is a function
+      if (context_mapper instanceof Function) {
+        model = context_mapper(model);
+
+        // The context defined on the model is a list of fields
+      } else if (context_mapper instanceof Array) {
+        if (context_mapper.length > 0 && context_mapper[0] !== '*') {
+          // Add any requested fields to the new contextualised object
+          let newInstance = Immutable.Map();
+          context_mapper.forEach(key => {
+            if (!model.has(key)) return;
+
+            // If its a relation check to see if the relation has the same context
+            if (Object.keys(this._availableRelations).includes(key)) {
+              const RelatedModel = this.klein.model(this._availableRelations[key].table);
+              newInstance = newInstance.set(key, RelatedModel.json(model.get(key), options.context));
+
+              // Just add normal fields
+            } else {
+              newInstance = newInstance.set(key, model.get(key));
+            }
+          });
+          model = newInstance;
+        }
+      }
+    }
+
+    return model.toJS()
   }
 
   /**

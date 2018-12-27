@@ -559,6 +559,52 @@ describe('JSON', () => {
     expect(user.has('updated')).toBeTruthy();
     expect(user.has('updatedAt')).toBeFalsy();
   });
+
+  test('It defers the context to the custom type of a model', () => {
+    const testType = (name) => ({
+      factory(props) {
+        return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+      },
+      instanceOf(maybeInstance) {
+        return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+      },
+      serialize(instance, options) {
+        return instance.get('wrapped').set('context', options && options.context).toObject();
+      }
+    });
+
+    const specialContext = (instance) => {
+      return instance.merge({
+        isSpecial: true
+      });
+    }
+    const Users = Klein.model('users', {
+      type: testType('user'),
+
+      contexts: {
+        special: specialContext,
+        simple: ['firstName', 'lastName'],
+        everything: '*'
+      }
+    });
+
+    const user = Immutable.fromJS({
+      type: 'user',
+      wrapped: {
+        firstName: 'Nathan',
+        lastName: 'Hoad',
+        email: 'test@test.com',
+        createdAt: new Date()
+      }
+    });
+
+    const json1 = Users.json(user, 'special')
+    expect(json1.context).toBe('special')
+    expect(json1.isSpecial).toBeUndefined()
+
+    const json2 = Users.json(user, specialContext)
+    expect(json2.context).toBe(specialContext)
+  })
 });
 
 describe('Schema', () => {
