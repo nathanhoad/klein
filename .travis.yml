@@ -4,6 +4,8 @@ node_js:
   - "lts/*"
 services:
   - postgresql
+addons:
+  postgresql: "9.4"
 before_script:
   - psql -c 'create database klein_test;' -U postgres
 env:
