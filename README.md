@@ -154,7 +154,7 @@ Klein.model('users', {
 });
 ```
 
-For models with [custom type definition](#custom-types), the custom instances are passed to the hooks.
+For models with a [custom type definition](#custom-types), the custom instances are passed to the hooks.
 
 #### `createdAt` and `updatedAt`
 
@@ -443,6 +443,7 @@ Users.create({ name: 'Nathan' }).then(user => {
 Users.all().then(users => {
   User.collectionOf(users) // => true
 });
+```
 
 ## Contributors
 
