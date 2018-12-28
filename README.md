@@ -1,4 +1,6 @@
-# Klein
+# Klein 
+
+[![Build Status](https://travis-ci.com/nathanhoad/klein.svg?branch=master)](https://travis-ci.com/nathanhoad/klein)
 
 A small ORM that combines ImmutableJS and knex.
 
@@ -151,6 +153,8 @@ Klein.model('users', {
   }
 });
 ```
+
+For models with a [custom type definition](#custom-types), the custom instances are passed to the hooks.
 
 #### `createdAt` and `updatedAt`
 
@@ -361,6 +365,84 @@ Klein.transaction(transaction => {
   .catch(err => {
     // Something failed and both User and Hat are now rolled back
   });
+```
+
+## Custom types
+
+By default, Klein returns `Immutable.Map` as instances with it's key and values mapped to the table's columns and values. It's possible to supply your own type definition for Klein to accept and return, as long as it can convert both ways.
+
+```javascript
+const Klein = require('klein').connect(process.env.DATABASE_URL);
+const Users = klein.model('users', {
+  type: {
+    // without defining a factory, the default `Immutable.Map` method is used
+    factory(rawProperties) {
+      // given raw properties, return the instance
+      return Immutable.fromJS(rawProperties).set('type', 'user');
+    },
+
+    // without instanceOf falls back to default of any `Immutable.Map` qualifying as an instance
+    instanceOf(maybeInstance) {
+      // return whether the given value is a valid instance
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === 'user';
+    },
+
+    // without serialize falls back to default of converting an `Immutable.Map` to plain JS object (deeply)
+    serialize(instance, options) {
+      // `options.context` and `options.contextName` are passed. The type definition is responsible for applying
+      // the context transformations.
+
+      // return a plain javascript version with keys and values mapping to columns and values
+      return instance.remove('type').toJS()
+    }
+  }
+})
+
+Users.create({ name: 'Nathan' }).then(user => {
+  user.get('type'); // => 'user'
+});
+```
+
+Note: when using hooks, the custom type instances are passed to the hooks, instead of the default `Immutable.Map`.
+
+### Vry
+
+Instead of defining your own custom types, Klein works really well with [Vry](https://www.npmjs.com/package/vry), which allows you to easily setup your type's logic. Just like Klein it uses `Immutable.Map` for instances, but adding a bit of metadata to allow for type identification, nested types, merging, references, etc.
+
+```javascript
+const klein = require('klein').connect(process.env.DATABASE_URL);
+const { Model } = require('vry')
+const Invariant = require('invariant')
+
+// define your single entity, with things like name and defaults
+const User = Model.create({
+  typeName: 'user',
+  defaults: {
+    name: 'Unknown user',
+    email: null
+  }
+})
+
+// add your own methods
+User.hasEmail = function(user) {
+  // make sure an actual user was passed
+  Invariant(User.instanceOf(user), 'User required to check whether user has an email')
+  
+  return !!user.get('email')
+}
+
+// Use your Vry model as a Klein type
+const Users = klein.model('users', {
+  type: User
+})
+
+Users.create({ name: 'Nathan' }).then(user => {
+  User.hasEmail(user) // => false
+});
+
+Users.all().then(users => {
+  User.collectionOf(users) // => true
+});
 ```
 
 ## Contributors

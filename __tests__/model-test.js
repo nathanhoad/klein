@@ -84,6 +84,33 @@ describe('Instances', () => {
     expect(list.get('tasks').count()).toBe(newList.tasks.length);
   });
 
+  test('It can create a custom new instance through a custom type factory', async () => {
+    process.env.APP_ROOT = '/tmp/klein/new-instance-custom-factory';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string', 'tasks:jsonb']], { knex: Klein.knex });
+
+    const customInstance = Immutable.Map({ something: 'else' })
+
+    const newList = {
+      name: 'Todo',
+      tasks: ['first', 'second', 'third']
+    };
+
+    const Lists = Klein.model('lists', { 
+      type: {
+        factory: (instance) => {
+          expect(instance.get('name')).toBe(newList.name);
+          return customInstance;
+        }
+      }
+    });
+
+    let list = await Lists.create(newList);
+
+    expect(customInstance.equals(list)).toBe(true);
+  });
+
   test('It can save/restore/destroy an instance', async () => {
     const Lists = Klein.model('lists');
 
@@ -120,6 +147,53 @@ describe('Instances', () => {
     list = await Lists.reload(deletedList);
     expect(list).toBeNull();
   });
+
+  test('It can save/restore/destroy an instance of custom type', async () => {
+    process.env.APP_ROOT = '/tmp/klein/save-and-restore-custom-instance';
+    FS.removeSync(process.env.APP_ROOT);
+
+    const newList = {
+      name: 'Todo',
+      tasks: ['first', 'second', 'third']
+    };
+
+    const Lists = Klein.model('lists', {
+      type: {
+        factory: (instance) => {
+          return instance.set('__typeName', 'list');
+        },
+        serialize: (customInstance) => {
+          return customInstance.remove('__typeName').toJS()
+        },
+        instanceOf: (maybeInstance) => {
+          return maybeInstance && maybeInstance.toJS && maybeInstance.get('__typeName') === 'list';
+        }
+      }
+    });
+
+    await Helpers.setupDatabase([['list', 'name:string', 'tasks:jsonb']], { knex: Klein.knex });
+
+    let list = await Lists.create(newList);
+
+    list = await Lists.find(list.get('id'));
+    expect(list.get('__typeName')).toBe('list');
+
+    list = list.set('name', 'New Name');
+    list = list.set('tasks', list.get('tasks').push('fourth'));
+    list = await Lists.save(list);
+    
+    list = await Lists.where({ name: 'New Name' }).first();
+
+    expect(list.get('name')).toBe('New Name');
+    expect(list.get('tasks').count()).toBe(newList.tasks.length + 1);
+    expect(list.get('tasks').last()).toBe('fourth');
+    expect(list.get('__typeName')).toBe('list');
+
+    let deletedList = await Lists.destroy(list);
+
+    list = await Lists.reload(deletedList);
+    expect(list).toBeNull();
+  })
 
   test('It throws when saving/restoring/destroying instances without being connected', async () => {
     const Lists = DisconnectedKlein.model('lists');
@@ -221,6 +295,45 @@ describe('Collections', () => {
 
     let lists = await Lists.create(newLists);
     expect(lists.getIn([0, 'name'])).toBe(newLists[0].name);
+
+    lists = await Lists.all();
+    expect(lists.count()).toBe(2);
+  });
+
+  test('It can save/restore a collection', async () => {
+    const testType = (name) => ({
+      factory(props) {
+        return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+      },
+      instanceOf(maybeInstance) {
+        return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+      },
+      serialize(instance) {
+        return instance.get('wrapped').toJS();
+      }
+    });
+    const Lists = Klein.model('lists', { type: testType('list') });
+
+    process.env.APP_ROOT = '/tmp/klein/save-and-restore-collection';
+    FS.removeSync(process.env.APP_ROOT);
+
+    const newLists = [
+      {
+        name: 'Todo',
+        tasks: ['first', 'second', 'third']
+      },
+      {
+        name: 'Done',
+        tasks: ['one', 'two']
+      }
+    ];
+
+    await Helpers.setupDatabase([['lists', 'name:string', 'tasks:jsonb']], { knex: Klein.knex });
+
+    let lists = await Lists.create(newLists);
+    expect(Immutable.List.isList(lists)).toBeTruthy();
+    expect(lists.getIn([0, 'type'])).toBe('list');
+    expect(lists.getIn([0, 'wrapped', 'name'])).toBe(newLists[0].name);
 
     lists = await Lists.all();
     expect(lists.count()).toBe(2);
@@ -446,6 +559,86 @@ describe('JSON', () => {
     expect(user.has('updated')).toBeTruthy();
     expect(user.has('updatedAt')).toBeFalsy();
   });
+
+  test('It defers the rendering of the context to the custom type of a model', () => {
+    const testType = (name) => ({
+      factory(props) {
+        return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+      },
+      instanceOf(maybeInstance) {
+        return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+      },
+      serialize(instance, options) {
+        return instance.get('wrapped')
+          // note: we can't use merge here, as it will cast arrays and objects to be Immutable
+          .set('context', options && options.context)
+          .set('contextName', options && options.contextName)
+          .toObject();
+      }
+    });
+
+    const specialContext = (instance) => {
+      return instance.merge({
+        isSpecial: true
+      });
+    }
+    const Users = Klein.model('users', {
+      type: testType('user'),
+
+      contexts: {
+        special: specialContext,
+        simple: ['firstName', 'lastName'],
+        everything: '*'
+      }
+    });
+
+    const Hats = Klein.model('hats', {
+      contexts: {
+        simple: ['type', 'user']
+      },
+      relations: {
+        user: { belongsTo: 'users' }
+      }
+    });
+
+    const user = Immutable.fromJS({
+      type: 'user',
+      wrapped: {
+        firstName: 'Nathan',
+        lastName: 'Hoad',
+        email: 'test@test.com',
+        createdAt: new Date()
+      }
+    });
+
+    const hat = Immutable.fromJS({
+      type: 'cowboy',
+      size: 'L',
+      user: user
+    })
+
+    const json1 = Users.json(user, 'special')
+    expect(json1.context).toBe(specialContext)
+    expect(json1.isSpecial).toBeUndefined()
+    expect(json1.contextName).toEqual('special')
+
+    const json2 = Users.json(user, specialContext)
+    expect(json2.context).toBe(specialContext)
+    expect(json2.contextName).toBeNull()
+
+    const json3 = Users.json(user, 'simple')
+    expect(json3.context).toEqual(['firstName', 'lastName'])
+    expect(json3.contextName).toEqual('simple')
+
+    const json4 = Users.json(user, 'everything')
+    expect(json4.context).toEqual('*')
+    expect(json4.contextName).toEqual('everything')
+
+    const json5 = Hats.json(hat, 'simple')
+    expect(json5.type).toEqual(hat.get('type'))
+    expect(json5.user.context).toEqual(['firstName', 'lastName'])
+    expect(json5.user.contextName).toEqual('simple')
+  })
 });
 
 describe('Schema', () => {
@@ -695,5 +888,34 @@ describe('Hooks', () => {
     expect(afterCreate).toBe(4);
     expect(beforeDestroy).toBe(5);
     expect(afterDestroy).toBe(6);
+  });
+
+  test('It is compatible with custom types', async () => {
+    const Lists = Klein.model('lists', {
+      type: {
+        factory: (instance) => {
+          return Immutable.Map({ custom: true, wrapped: Immutable.fromJS(instance) })
+        },
+        serialize: (instance) => {
+          return instance.get('wrapped').toJS()
+        }
+      },
+      hooks: {
+        beforeCreate(model) {
+          expect(model.get('custom')).toBeTruthy()
+          return model.setIn(['wrapped', 'dueDate'], new Date(2017, 0, 1));
+        }
+      }
+    });
+
+    process.env.APP_ROOT = '/tmp/klein/hooks-custom-types';
+    FS.removeSync(process.env.APP_ROOT);
+
+    await Helpers.setupDatabase([['list', 'name:string', 'dueDate:timestamp']], { knex: Klein.knex });
+
+    const list = await Lists.create({ name: 'New List' });
+
+    expect(list.getIn(['wrapped', 'dueDate'])).not.toBeUndefined();
+    expect(list.getIn(['wrapped', 'dueDate'])).toBeInstanceOf(Date);
   });
 });

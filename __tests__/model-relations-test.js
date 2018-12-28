@@ -227,6 +227,128 @@ test('It can load belongsTo, hasOne, and hasMany relations with different keys',
   expect(teams.find(t => t.get('name') == newTeams[1].name).getIn(['profile', 'bio'])).toBe(newProfiles[1].bio);
 });
 
+test('It can load belongsTo, hasOne, and hasMany relations for model with custom instances', async () => {
+  const testType = (name) => ({
+    factory(props) {
+      return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+    },
+    instanceOf(maybeInstance) {
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+    },
+    serialize(instance) {
+      return instance.get('wrapped').toJS();
+    }
+  });
+
+  const Users = Klein.model('users', {
+    type: testType('user'),
+    relations: {
+      team: { belongsTo: 'team' }
+    }
+  });
+  const Teams = Klein.model('teams', {
+    type: testType('team'),
+    relations: {
+      users: { hasMany: 'users' },
+      profile: { hasOne: 'profile' }
+    }
+  });
+  const Profiles = Klein.model('profiles', {
+    type: testType('profile'),
+
+    relations: {
+      team: { belongsTo: 'team' }
+    }
+  });
+
+  process.env.APP_ROOT = '/tmp/klein/relations-load-custom-types';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const newTeams = [
+    {
+      id: uuid(),
+      name: 'Awesome'
+    },
+    {
+      id: uuid(),
+      name: 'Gamers'
+    }
+  ];
+
+  const newUsers = [
+    {
+      name: 'Nathan',
+      teamId: newTeams[0].id
+    },
+    {
+      name: 'Lilly',
+      teamId: newTeams[0].id
+    },
+    {
+      name: 'Ben',
+      teamId: newTeams[1].id
+    }
+  ];
+
+  const newProfiles = [
+    {
+      bio: 'We are the best, obviously',
+      teamId: newTeams[0].id
+    },
+    {
+      bio: 'Overcooked is our religion',
+      teamId: newTeams[1].id
+    }
+  ];
+
+  await Helpers.setupDatabase(
+    [['users', 'name:string', 'teamId:uuid'], ['teams', 'name:string'], ['profiles', 'bio:string', 'teamId:uuid']],
+    {
+      knex: Klein.knex
+    }
+  );
+  await Users.create(newUsers);
+
+  let teams = await Teams.create(newTeams);
+  let profiles = await Profiles.create(newProfiles);
+  let users = await Users.include('team').all();
+
+  expect(users.count()).toBe(3);
+
+  let nathan = users.find(u => u.getIn(['wrapped', 'name']) === 'Nathan');
+  expect(nathan).toBeTruthy();
+  expect(nathan.getIn(['wrapped', 'team', 'wrapped', 'name'])).toBe(newTeams[0].name);
+
+  let lilly = users.find(u => u.getIn(['wrapped', 'name']) === 'Lilly');
+  expect(lilly).toBeTruthy();
+  expect(lilly.getIn(['wrapped', 'team', 'wrapped', 'name'])).toBe(newTeams[0].name);
+
+  let ben = users.find(u => u.getIn(['wrapped', 'name']) === 'Ben');
+  expect(ben).toBeTruthy();
+  expect(ben.getIn(['wrapped', 'team', 'wrapped', 'name'])).toBe(newTeams[1].name);
+
+  teams = await Teams.include('users').all();
+  expect(teams.count()).toBe(2);
+  expect(
+    teams
+      .find(t => t.getIn(['wrapped', 'name']) === newTeams[0].name)
+      .getIn(['wrapped', 'users'])
+      .count()
+  ).toBe(2);
+  expect(
+    teams
+      .find(t => t.getIn(['wrapped','name']) === newTeams[1].name)
+      .getIn(['wrapped', 'users'])
+      .count()
+  ).toBe(1);
+
+  teams = await Teams.include('profile').all();
+
+  expect(teams.count()).toBe(2);
+  expect(teams.find(t => t.getIn(['wrapped', 'name']) == newTeams[0].name).getIn(['wrapped', 'profile', 'wrapped', 'bio'])).toBe(newProfiles[0].bio);
+  expect(teams.find(t => t.getIn(['wrapped', 'name']) == newTeams[1].name).getIn(['wrapped', 'profile', 'wrapped', 'bio'])).toBe(newProfiles[1].bio);
+});
+
 test('It can load hasAndBelongsToMany relations', async () => {
   const Users = Klein.model('users', {
     relations: {
@@ -367,6 +489,86 @@ test('It can load hasAndBelongsToMany relations with different keys', async () =
   expect(users.count()).toBe(3);
 });
 
+test('It can load hasAndBelongsToMany relations for model with custom instances', async () => {
+  const testType = (name) => ({
+    factory(props) {
+      return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+    },
+    instanceOf(maybeInstance) {
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+    },
+    serialize(instance) {
+      return instance.get('wrapped').toObject();
+    }
+  });
+
+  const Users = Klein.model('users', {
+    type: testType('user'),
+    relations: {
+      projects: { hasAndBelongsToMany: 'projects' }
+    }
+  });
+  const Projects = Klein.model('projects', {
+    type: testType('project'),
+    relations: {
+      users: { hasAndBelongsToMany: 'users' }
+    }
+  });
+  const ProjectsUsers = Klein.model('projects_users');
+
+  process.env.APP_ROOT = '/tmp/klein/has-and-belongs-to-many';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const newProjects = [
+    {
+      id: uuid(),
+      name: 'Awesome Game'
+    },
+    {
+      id: uuid(),
+      name: 'Design'
+    }
+  ];
+
+  const newUsers = [
+    {
+      name: 'Nathan'
+    },
+    {
+      name: 'Lilly'
+    },
+    {
+      name: 'Ben'
+    }
+  ];
+
+  const NewProjectsUsers = [
+    // Nathan is on Awesome Game
+    { projectId: newProjects[0].id, userId: newUsers[0].id },
+    // Nathan is on Design
+    { projectId: newProjects[1].id, userId: newUsers[0].id },
+
+    // Lilly is on Awesome Game
+    { projectId: newProjects[0].id, userId: newUsers[1].id },
+
+    // Ben is on Design
+    { projectId: newProjects[1].id, userId: newUsers[2].id }
+  ];
+
+  await Helpers.setupDatabase(
+    [['users', 'name:string'], ['projects_users', 'userId:uuid', 'projectId:uuid'], ['projects', 'name:string']],
+    { knex: Klein.knex }
+  );
+
+  await Users.create(newUsers);
+  await Projects.create(newProjects);
+  await ProjectsUsers.create(NewProjectsUsers);
+
+  let users = await Users.include('projects').all();
+  expect(users.count()).toBe(3);
+  expect(users.first().get('type')).toBe('user');
+});
+
 test('It can save an object that has a hasOne relation on it', async () => {
   const Users = Klein.model('users', {
     relations: {
@@ -424,6 +626,85 @@ test('It can save an object that has a hasOne relation on it', async () => {
 
   profile = await Profiles.include('user').find(profile.get('id'));
   expect(profile.get('user')).toBeFalsy();
+});
+
+test('It can save an object that has a hasOne relation on it for model with custom instance', async () => {
+  const testType = (name) => ({
+    factory(props) {
+      return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+    },
+    instanceOf(maybeInstance) {
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+    },
+    serialize(instance) {
+      return instance.get('wrapped').toObject();
+    }
+  });
+
+  const Users = Klein.model('users', {
+    type: testType('user'),
+    relations: {
+      profile: { hasOne: 'profile' }
+    }
+  });
+  const Profiles = Klein.model('profiles', {
+    type: testType('profile'),
+    relations: {
+      user: { belongsTo: 'user' }
+    }
+  });
+
+  process.env.APP_ROOT = '/tmp/klein/save-has-one';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const initialProfile = Immutable.fromJS({
+    type: 'profile',
+    wrapped: {
+      bio: 'Working on Awesome Game'
+    }
+  });
+
+  const replacementProfile = Immutable.fromJS({
+    type: 'profile',
+    wrapped: {
+      bio: 'Working on Design'
+    }
+  });
+
+  const newUser = {
+    name: 'Nathan'
+  };
+
+  await Helpers.setupDatabase([['users', 'name:string'], ['profiles', 'bio:string', 'userId:uuid']], {
+    knex: Klein.knex
+  });
+
+  let user = await Users.create(newUser);
+
+  expect(typeof user.getIn(['wrapped', 'profile'])).toBe('undefined');
+
+  user = user.setIn(['wrapped', 'profile'], initialProfile);
+  user = await Users.save(user);
+
+  expect(user.getIn(['wrapped', 'profile'])).toBeTruthy();
+
+  let profile = await Profiles.where({ bio: initialProfile.getIn(['wrapped', 'bio']) })
+    .include('user')
+    .first();
+  expect(user.getIn(['wrapped', 'profile', 'wrapped', 'id'])).toBe(profile.getIn(['wrapped', 'id']));
+  expect(profile.getIn(['wrapped', 'user', 'wrapped', 'id'])).toBe(user.getIn(['wrapped', 'id']));
+
+  user = user.setIn(['wrapped', 'profile'], replacementProfile);
+  user = await Users.save(user);
+
+  let otherProfile = await Profiles.where({ bio: replacementProfile.getIn(['wrapped', 'bio']) })
+    .include('user')
+    .first();
+  expect(user.getIn(['wrapped', 'profile', 'wrapped', 'id'])).toBe(otherProfile.getIn(['wrapped', 'id']));
+  expect(otherProfile.getIn(['wrapped', 'user', 'wrapped', 'id'])).toBe(user.getIn(['wrapped', 'id']));
+
+  profile = await Profiles.include('user').find(profile.getIn(['wrapped', 'id']));
+  expect(profile.getIn(['wrapped', 'user', 'wrapped'])).toBeFalsy();
 });
 
 test('It can save an object that has hasAndBelongsToMany relations on it', async () => {
@@ -499,6 +780,108 @@ test('It can save an object that has hasAndBelongsToMany relations on it', async
   // Make sure subsequent saves don't add duplicates
   user = await Users.save(users.first());
   expect(user.get('projects').count()).toBe(3);
+
+  let projectsUsers = await ProjectsUsers.all();
+  expect(projectsUsers.count()).toBe(3);
+});
+
+test('It can save an object that has hasAndBelongsToMany relations on it for model with custom instance', async () => {
+  const testType = (name) => ({
+    factory(props) {
+      return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+    },
+    instanceOf(maybeInstance) {
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+    },
+    serialize(instance) {
+      return instance.get('wrapped').toObject();
+    }
+  });
+
+  const Users = Klein.model('users', {
+    type: testType('user'),
+    relations: {
+      projects: { hasAndBelongsToMany: 'projects' }
+    }
+  });
+  const Projects = Klein.model('projects', {
+    type: testType('project'),
+    relations: {
+      users: { hasAndBelongsToMany: 'users' }
+    }
+  });
+  const ProjectsUsers = Klein.model('projects_users');
+
+  process.env.APP_ROOT = '/tmp/klein/save-has-and-belongs-to-many';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const newProjects = Immutable.fromJS([
+    {
+      type: 'project',
+      wrapped: {
+        name: 'Awesome Game'
+      }
+    },
+    {
+      type: 'project',
+      wrapped: {
+        id: uuid(),
+        name: 'Design'
+      }
+    }
+  ]);
+
+  const persistedProject = Immutable.fromJS({
+    type: 'project',
+    wrapped: {
+      name: 'Persisted'
+    }
+  });
+
+  const newUser = {
+    name: 'Nathan'
+  };
+
+  await Helpers.setupDatabase(
+    [['users', 'name:string'], ['projects_users', 'userId:uuid', 'projectId:uuid'], ['projects', 'name:string']],
+    { knex: Klein.knex }
+  );
+
+  let project = await Projects.create(persistedProject);
+  let user = await Users.create(newUser);
+
+  // Add the first two unsaved projects
+  user = user.setIn(['wrapped', 'projects'], newProjects);
+  user = await Users.save(user);
+  expect(user.getIn(['wrapped', 'projects']).count()).toBe(2);
+  expect(user.getIn(['wrapped', 'projects']).first().get('type')).toBe('project')
+
+  // Add the third, already saved project
+  user = user.setIn(['wrapped', 'projects'], user.getIn(['wrapped', 'projects']).push(project));
+  user = await Users.save(user);
+
+  expect(user.getIn(['wrapped', 'projects']).count()).toBe(3);
+  expect(user.getIn(['wrapped', 'projects']).find(p => p.getIn(['wrapped', 'id']) === project.getIn(['wrapped', 'id']))).not.toBeNull();
+
+  let users = await Users.include('projects').all();
+
+  expect(
+    users
+      .first()
+      .getIn(['wrapped', 'projects'])
+      .count()
+  ).toBe(3);
+
+  project = users
+    .first()
+    .getIn(['wrapped', 'projects'])
+    .find(p => p.getIn(['wrapped', 'name']) === newProjects.first().getIn(['wrapped', 'name']));
+
+  expect(typeof project.getIn(['wrapped', 'id']) !== 'undefined').toBeTruthy();
+
+  // Make sure subsequent saves don't add duplicates
+  user = await Users.save(users.first());
+  expect(user.getIn(['wrapped', 'projects']).count()).toBe(3);
 
   let projectsUsers = await ProjectsUsers.all();
   expect(projectsUsers.count()).toBe(3);
@@ -639,6 +1022,103 @@ test('It can save an object that has hasMany relations on it and one of them als
   expect(list.get('id')).toBe(firstList.get('id'));
 });
 
+test('It can save an object that has hasMany relations on it for model with custom instance', async () => {
+  const testType = (name) => ({
+    factory(props) {
+      return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+    },
+    instanceOf(maybeInstance) {
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+    },
+    serialize(instance) {
+      return instance.get('wrapped').toObject();
+    }
+  });
+
+  const Users = Klein.model('users', {
+    type: testType('user'),
+    relations: {
+      projects: { hasMany: 'projects' }
+    }
+  });
+  const Projects = Klein.model('projects', {
+    type: testType('project'),
+    relations: {
+      user: { belongsTo: 'user' }
+    }
+  });
+
+  process.env.APP_ROOT = '/tmp/klein/saving-has-many';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const newProjects = Immutable.fromJS([
+    {
+      type: 'project',
+      wrapped: { 
+        name: 'Awesome Game' 
+      }
+    },
+    {
+      type: 'project',
+      wrapped: {
+        id: uuid(),
+        name: 'Design'
+      }
+    }
+  ]);
+
+  const persistedProject = Immutable.fromJS({
+    type: 'project', 
+    wrapped: {
+      name: 'Persisted'
+    }
+  });
+
+  const newUser = {
+    name: 'Nathan'
+  };
+
+  await Helpers.setupDatabase([['users', 'name:string'], ['projects', 'name:string', 'userId:uuid']], {
+    knex: Klein.knex
+  });
+
+  let project = await Projects.create(persistedProject);
+  let user = await Users.create(newUser);
+
+  // Add the first two unsaved projects
+  user = user.setIn(['wrapped', 'projects'], newProjects);
+  user = await Users.save(user);
+
+  expect(user.getIn(['wrapped', 'projects']).filter((project) => project.getIn(['wrapped', 'id'])).count()).toBe(2);
+
+  // Add the third, already saved project
+  user = user.setIn(['wrapped', 'projects'], user.getIn(['wrapped', 'projects']).push(project));
+  user = await Users.save(user);
+
+  expect(user.getIn(['wrapped', 'projects']).count()).toBe(3);
+  expect(user.getIn(['wrapped', 'projects']).find(p => p.getIn(['wrapped', 'id']) === project.getIn(['wrapped' ,'id']))).not.toBeNull();
+
+  let users = await Users.include('projects').all();
+
+  expect(
+    users
+      .first()
+      .getIn(['wrapped', 'projects'])
+      .count()
+  ).toBe(3);
+
+  project = users
+    .first()
+    .getIn(['wrapped', 'projects'])
+    .find(p => p.getIn(['wrapped', 'name']) === newProjects.first().getIn(['wrapped', 'name']));
+
+  expect(typeof project.getIn(['wrapped', 'id'])).not.toBe('undefined');
+
+  project = await Projects.find(project.getIn(['wrapped', 'id']));
+  user = await Users.first();
+  expect(project.getIn(['wrapped', 'userId'])).toBe(user.getIn(['wrapped', 'id']));
+});
+
 test('It can save an object that has a belongsTo relations on it', async () => {
   const Users = Klein.model('users', {
     relations: {
@@ -703,6 +1183,95 @@ test('It can save an object that has a belongsTo relations on it', async () => {
     .first();
   expect(project.get('user')).toBe(null);
   expect(replacementUser.get('projects').count()).toBe(0);
+});
+
+test('It can save an object that has a belongsTo relations on it for model with custom instance', async () => {
+  const testType = (name) => ({
+    factory(props) {
+      return Immutable.Map({ type: name, wrapped: Immutable.fromJS(props) });
+    },
+    instanceOf(maybeInstance) {
+      return Immutable.Map.isMap(maybeInstance) && maybeInstance.get('type') === name;
+    },
+    serialize(instance) {
+      return instance.get('wrapped').toObject();
+    }
+  });
+
+  const Users = Klein.model('users', {
+    type: testType('user'),
+    relations: {
+      projects: { hasMany: 'projects' }
+    }
+  });
+  const Projects = Klein.model('projects', {
+    type: testType('project'),
+    relations: {
+      user: { belongsTo: 'user' }
+    }
+  });
+
+  process.env.APP_ROOT = '/tmp/klein/saving-belongs-to';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const newProject = Immutable.fromJS({
+    type: 'project',
+    wrapped: {
+      id: uuid(),
+      name: 'Awesome Game'
+    }
+  });
+
+  let initialUser = Immutable.fromJS({
+    type: 'user',
+    wrapped: { 
+      name: 'Nathan'
+    }
+  });
+
+  let replacementUser = Immutable.fromJS({
+    type: 'user',
+    wrapped: {
+      name: 'Lilly'
+    }
+  });
+
+  await Helpers.setupDatabase([['users', 'name:string'], ['projects', 'name:string', 'userId:uuid']], {
+    knex: Klein.knex
+  });
+
+  let project = await Projects.create(newProject);
+  // User is nothing initially
+  expect(typeof project.getIn(['wrapped', 'user'])).toBe('undefined');
+
+  project = project.setIn(['wrapped', 'user'], initialUser);
+  project = await Projects.save(project);
+  // User was persisted and attached to the project
+  initialUser = await Users.where({ name: initialUser.getIn(['wrapped', 'name']) })
+    .include('projects')
+    .first();
+  expect(project.getIn(['wrapped', 'user', 'wrapped', 'id'])).toBe(initialUser.getIn(['wrapped', 'id']));
+  expect(initialUser.getIn(['wrapped', 'projects', 0, 'wrapped', 'id'])).toBe(project.getIn(['wrapped', 'id']));
+
+  project = project.setIn(['wrapped', 'user'], replacementUser);
+  project = await Projects.save(project);
+  replacementUser = await Users.where({ name: replacementUser.getIn(['wrapped', 'name']) })
+    .include('projects')
+    .first();
+  expect(project.getIn(['wrapped', 'user', 'wrapped', 'id'])).toBe(replacementUser.getIn(['wrapped', 'id']));
+  expect(replacementUser.getIn(['wrapped', 'projects', 0, 'wrapped', 'id'])).toBe(project.getIn(['wrapped', 'id']));
+
+  // Check that the initialUser projects is now empty
+  initialUser = await Users.include('projects').find(initialUser.getIn(['wrapped', 'id']));
+  expect(initialUser.getIn(['wrapped', 'projects']).count()).toBe(0);
+
+  project = project.setIn(['wrapped', 'user'], null);
+  project = await Projects.save(project);
+  replacementUser = await Users.where({ name: replacementUser.getIn(['wrapped', 'name']) })
+    .include('projects')
+    .first();
+  expect(project.getIn(['wrapped', 'user'])).toBe(null);
+  expect(replacementUser.getIn(['wrapped', 'projects']).count()).toBe(0);
 });
 
 test('It can destroy dependent objects when destroying the parent', async () => {

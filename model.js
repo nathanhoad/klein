@@ -1,6 +1,7 @@
 const Immutable = require('immutable');
 const Inflect = require('i')();
 const uuid = require('uuid/v4');
+const _isPlainObject = require('lodash.isplainobject');
 
 class Model {
   /**
@@ -195,7 +196,7 @@ class Model {
 
     if (typeof options === 'undefined') options = {};
 
-    let properties = model.toJS ? model.toJS() : Object.assign({}, model);
+    let properties = Object.assign({}, this._serialize(model));
 
     // Detach relations because they can't be saved against this record
     let relations = {};
@@ -207,7 +208,7 @@ class Model {
     });
 
     // Convert everything to something we can put into the database
-    properties = this._serialize(properties);
+    properties = this._prepareFields(properties);
     this._updateTimestamp(properties, 'updatedAt');
 
     // Check if the record has already been persisted
@@ -258,7 +259,7 @@ class Model {
       this._hook('afterCreate', object);
     }
 
-    return Immutable.fromJS(object);
+    return this._factory(object);
   }
 
   /**
@@ -371,7 +372,7 @@ class Model {
       return this._includeRelations(results, options).then(results => {
         let result = Object.assign({}, results[0]);
 
-        return Immutable.fromJS(result);
+        return this._factory(result);
       });
     });
   }
@@ -392,7 +393,7 @@ class Model {
       results = results.map(r => Object.assign({}, r));
 
       return this._includeRelations(results, options).then(results => {
-        return Immutable.fromJS(results);
+        return Immutable.List(results.map((r) => this._factory(r)));
       });
     });
   }
@@ -460,50 +461,15 @@ class Model {
     if (typeof context === 'undefined') context = 'default';
 
     // If a List is given then map over the items
-    if (instanceOrList instanceof Immutable.List || instanceOrList instanceof Array) {
+    if (Immutable.List.isList(instanceOrList) || instanceOrList instanceof Array) {
       const list = instanceOrList.map(instance => this.json(instance, context));
-      return list.toJS ? list.toJS() : list;
+      return list.toArray ? list.toArray() : list;
     }
 
     // If a normal map is given
     let instance = instanceOrList;
 
-    // Map the instance depending on the given context
-
-    // Given a literal function as the context
-    if (context instanceof Function) {
-      instance = context(instance);
-    } else {
-      const context_mapper = this.contexts[context];
-
-      // The context defined on the model is a function
-      if (context_mapper instanceof Function) {
-        instance = context_mapper(instance);
-
-        // The context defined on the model is a list of fields
-      } else if (context_mapper instanceof Array) {
-        if (context_mapper.length > 0 && context_mapper[0] !== '*') {
-          // Add any requested fields to the new contextualised object
-          let newInstance = Immutable.Map();
-          context_mapper.forEach(key => {
-            if (!instance.has(key)) return;
-
-            // If its a relation check to see if the relation has the same context
-            if (Object.keys(this._availableRelations).includes(key)) {
-              const RelatedModel = this.klein.model(this._availableRelations[key].table);
-              newInstance = newInstance.set(key, RelatedModel.json(instance.get(key), context));
-
-              // Just add normal fields
-            } else {
-              newInstance = newInstance.set(key, instance.get(key));
-            }
-          });
-          instance = newInstance;
-        }
-      }
-    }
-
-    return instance.toJS ? instance.toJS() : instance;
+    return this._serialize(instance, { context })
   }
 
   /**
@@ -530,12 +496,98 @@ class Model {
   }
 
   /**
+   * Create instance of the model
+   * @param {Object} properties
+   * @returns {Model}
+   */
+  _factory(properties) {
+    const immutable = Immutable.fromJS(properties);
+    
+    if (this.args.type && typeof this.args.type.factory === 'function') {
+      return this.args.type.factory(immutable);
+    } else {
+      return immutable;
+    }
+  }
+
+  /**
+   * Serialize model to plain object
+   * @param {Model|Object}
+   * @param {Object?} options
+   * @return {Object}
+   */
+  _serialize(model, options) {
+    if (typeof options === 'undefined') options = {};
+
+    const verifyResult = (result) => {
+      if (!_isPlainObject(result)) {
+        throw new Error(`serialize of '${this.tableName}' Klein.model must return a plain object`);
+      }
+      return result;
+    }
+    
+    if (!this._instanceOf(model)) return verifyResult(model);
+
+    // resolve context, so that however we serialize, it can be taken into account
+    const context = !options.context ? null :
+      options.context instanceof Function ? options.context :
+      this.contexts[options.context]
+    const contextName = options.context && typeof options.context === 'string' ? options.context : null
+
+    if (this.args.type && typeof this.args.type.serialize === 'function') {
+      let result = this.args.type.serialize(model, { ...options, context, contextName });
+      return verifyResult(result);
+    }
+
+    // The context defined on the model is a function
+    if (context instanceof Function) {
+      model = context(model);
+
+      // The context defined on the model is a list of fields
+    } else if (context instanceof Array) {
+      if (context.length > 0 && context[0] !== '*') {
+        // Add any requested fields to the new contextualised object
+        let newInstance = Immutable.Map();
+        context.forEach(key => {
+          if (!model.has(key)) return;
+
+          // If its a relation check to see if the relation has the same context
+          if (Object.keys(this._availableRelations).includes(key)) {
+            const RelatedModel = this.klein.model(this._availableRelations[key].table);
+            newInstance = newInstance.set(key, RelatedModel.json(model.get(key), options.context));
+
+            // Just add normal fields
+          } else {
+            newInstance = newInstance.set(key, model.get(key));
+          }
+        });
+        model = newInstance;
+      }
+    }
+
+    return model.toJS ? model.toJS() : model
+  }
+
+  /**
+   * Determine whether the given object is considered an instance of the model
+   * @param {Immutable.Map|Object}
+   * @return {boolean}
+   */
+  _instanceOf(maybeModel) {
+    if (this.args.type && typeof this.args.type.instanceOf === 'function') {
+      return !!this.args.type.instanceOf(maybeModel);
+    } else {
+      return !!maybeModel.toJS;
+    }
+  }
+
+  /**
    * Create a clone of an Immutable Map or JSON Object as a JSON Object with stringified JSON fields
    * @param {Immutable.Map|Object} model 
    * @returns {Object}
    */
-  _serialize(model) {
-    let properties = model.toJS ? model.toJS() : Object.assign({}, model);
+  _prepareFields(model) {
+    let properties = Object.assign({}, this._serialize(model))
 
     if (typeof properties.id === 'undefined') {
       if (typeof this.args.generateId === 'function') {
@@ -573,7 +625,7 @@ class Model {
     if (typeof hookFn !== 'function') return properties;
 
     // Convert to Immutable for the hook
-    properties = await hookFn(properties.toJS ? properties : Immutable.fromJS(properties), extraInfo);
+    properties = await hookFn(this._instanceOf(properties) ? properties : this._factory(properties), extraInfo);
 
     // beforeCreate and beforeSave must return something
     if (typeof properties !== 'object' && ['beforeSave', 'beforeCreate'].includes(hook)) {
@@ -582,7 +634,7 @@ class Model {
 
     if (typeof properties === 'object') {
       // Convert back to raw to give back to the model
-      return properties.toJS ? properties.toJS() : properties;
+      return this._serialize(properties);
     }
 
     return true;
@@ -595,7 +647,7 @@ class Model {
    * @returns {Object} The serialized model
    */
   async _saveRelations(model, options) {
-    let properties = model.toJS ? model.toJS() : model;
+    let properties = this._serialize(model);
 
     const propertiesThatAreRelations = Object.keys(properties).filter(p =>
       Object.keys(this._availableRelations).includes(p)
@@ -647,10 +699,12 @@ class Model {
    * @param {Object} options 
    */
   async _saveHasManyRelation(model, relation, relatedObjects, options) {
-    model = model.toJS ? model.toJS() : model;
+    model = this._serialize(model);
 
     // Get or make a Klein Model for the related table
     const RelatedModel = this.klein.model(relation.table);
+    relatedObjects = relatedObjects.map(r => RelatedModel._serialize(r));
+    if (Immutable.List.isList(relatedObjects)) relatedObjects = relatedObjects.toArray()
 
     // find any objects that have already been persisted
     let newRelatedObjectsIds = relatedObjects.map(r => r.id).filter(id => id && typeof id !== 'undefined');
@@ -694,27 +748,29 @@ class Model {
    * @param {Object} options eg. options.transaction
    */
   async _saveBelongsToRelation(model, relation, relatedObject, options) {
-    model = model.toJS ? model.toJS() : model;
+    model = this._serialize(model);
+    const RelatedModel = this.klein.model(relation.table);
 
     var foreignValue;
 
     if (relatedObject) {
-      let RelatedModel = this.klein.model(relation.table);
       foreignValue = await RelatedModel.save(relatedObject);
     } else {
       foreignValue = null;
     }
 
+    const foreignId = foreignValue && RelatedModel._serialize(foreignValue).id
+
     await this.knex(this.tableName, options)
       .where({ id: model.id })
-      .update({ [relation.key]: foreignValue && foreignValue.get('id') });
+      .update({ [relation.key]: foreignId });
 
     return {
       name: relation.name,
       value: foreignValue,
       // Return with the information to update the current model
       belongsToKey: relation.key,
-      belongsToValue: foreignValue && foreignValue.get('id')
+      belongsToValue: foreignId
     };
   }
 
@@ -722,13 +778,15 @@ class Model {
    * Save a hasAndBelongsToMany relationship on this model
    * @param {Immutable.Map|Object} model The model with relations
    * @param {Object} relation The relation information
-   * @param {Array} relatedObjects The actual related objects
+   * @param {Array|Immutable.List} relatedObjects The actual related objects
    * @param {Object} options eg. options.transaction
    */
   async _saveHasAndBelongsToManyRelation(model, relation, relatedObjects, options) {
-    model = model.toJS ? model.toJS() : model;
+    model = this._serialize(model);
 
     const RelatedModel = this.klein.model(relation.table);
+    relatedObjects = relatedObjects.map(r => RelatedModel._serialize(r));
+    if (Immutable.List.isList(relatedObjects)) relatedObjects = relatedObjects.toArray()
 
     // eg. Users.save(user) where user.has('projects')
     // relation_ids would be project_ids
@@ -764,11 +822,12 @@ class Model {
           })
         );
 
+        const relatedId = RelatedModel._serialize(relatedModel).id
         // See if we need to insert a new join row
-        if (!existingRelatedObjectIds.includes(relatedModel.get('id'))) {
+        if (!existingRelatedObjectIds.includes(relatedId)) {
           const newJoinRow = {
             id: uuid(),
-            [relation.key]: relatedModel.get('id'),
+            [relation.key]: relatedId,
             [relation.sourceKey]: model.id
           };
           this._updateTimestamp(newJoinRow, 'updatedAt');
@@ -776,7 +835,7 @@ class Model {
           await this.knex(relation.throughTable, options).insert(newJoinRow, 'id');
         }
 
-        return relatedObject;
+        return relatedModel;
       })
     );
 
@@ -794,10 +853,11 @@ class Model {
    * @param {Object} options eg. options.transaction
    */
   async _saveHasOneRelation(model, relation, relatedObject, options) {
-    model = model.toJS ? model.toJS() : model;
+    model = this._serialize(model);
 
     // Get or make a Klein model for the related table
     const RelatedModel = this.klein.model(relation.table);
+    relatedObject = RelatedModel._serialize(relatedObject);
 
     // find any objects that have already been persisted
     let newRelatedObjectsIds = [relatedObject].map(r => r.id).filter(id => id && typeof id !== 'undefined');
@@ -842,6 +902,7 @@ class Model {
     const relations = await Promise.all(
       this._includedRelations.map(async relationName => {
         const relation = this._availableRelations[relationName];
+        const model = this.klein.model(relation.table)
 
         // If there is no relation with that name then throw an error
         if (typeof relation == 'undefined') throw new Error(`'${relationName}' is not a relation`);
@@ -852,7 +913,7 @@ class Model {
           const relatedRows = (await this.knex(relation.table, options)
             .select('*')
             .whereIn(relation.key, ids)).map(r => Object.assign({}, r));
-          return { name: relationName, properties: relation, rows: relatedRows };
+          return { name: relationName, properties: relation, rows: relatedRows, model: model };
         } else if (relation.type === 'hasAndBelongsToMany') {
           // eg.
           // User has many Projects (through users_projects)
@@ -869,7 +930,8 @@ class Model {
             name: relationName,
             properties: relation,
             joins: joins,
-            rows: relatedRows
+            rows: relatedRows,
+            model: model
           };
         } else if (relation.type === 'hasOne') {
           // Not sure when this would ever be used
@@ -877,7 +939,7 @@ class Model {
             .select('*')
             .whereIn(relation.key, ids)
             .map(r => Object.assign({}, r));
-          return { name: relationName, properties: relation, rows: relatedRows };
+          return { name: relationName, properties: relation, rows: relatedRows, model: model };
         } else if (relation.type === 'belongsTo') {
           // eg.
           // User belongs to Department
@@ -886,10 +948,10 @@ class Model {
           const relatedRows = (await this.knex(relation.table, options)
             .select('*')
             .whereIn('id', relationIds)).map(r => Object.assign({}, r));
-          return { name: relationName, properties: relation, rows: relatedRows };
+          return { name: relationName, properties: relation, rows: relatedRows, model: model };
         } else {
           // No matching type?
-          return { name: relationName, properties: relation, rows: [] };
+          return { name: relationName, properties: relation, rows: [], model: model };
         }
       })
     );
@@ -899,15 +961,21 @@ class Model {
       relations.forEach(relation => {
         switch (relation.properties.type) {
           case 'belongsTo':
-            result[relation.name] = relation.rows.find(r => r.id === result[relation.properties.key]);
+            result[relation.name] = relation.model._factory(
+              relation.rows.find(r => r.id === result[relation.properties.key])
+            );
             break;
 
           case 'hasMany':
-            result[relation.name] = relation.rows.filter(r => r[relation.properties.key] === result.id);
+            result[relation.name] = relation.rows
+              .filter(r => r[relation.properties.key] === result.id)
+              .map(r => relation.model._factory(r))
             break;
 
           case 'hasOne':
-            result[relation.name] = relation.rows.find(r => r[relation.properties.key] === result.id);
+            result[relation.name] = relation.model._factory(
+              relation.rows.find(r => r[relation.properties.key] === result.id)
+            );
             break;
 
           case 'hasAndBelongsToMany':
@@ -917,7 +985,9 @@ class Model {
                   .filter(j => j[relation.properties.sourceKey] == result.id)
                   .map(j => j[relation.properties.key])
               : [];
-            result[relation.name] = relation.rows.filter(r => joinIds.includes(r.id));
+            result[relation.name] = relation.rows
+              .filter(r => joinIds.includes(r.id))
+              .map(r => relation.model._factory(r));
             break;
         }
       });
