@@ -1,6 +1,6 @@
 {
   "name": "klein",
-  "version": "2.0.14",
+  "version": "2.1.0",
   "description": "A small ORM that combines ImmutableJS and knex",
   "main": "index.js",
   "bin": {
