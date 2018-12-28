@@ -409,7 +409,7 @@ Note: when using hooks, the custom type instances are passed to the hooks, inste
 
 Instead of defining your own custom types, Klein works really well with [Vry](https://www.npmjs.com/package/vry), which allows you to easily setup your type's logic. Just like Klein it uses `Immutable.Map` for instances, but adding a bit of metadata to allow for type identification, nested types, merging, references, etc.
 
-```
+```javascript
 const klein = require('klein').connect(process.env.DATABASE_URL);
 const { Model } = require('vry')
 const Invariant = require('invariant')
