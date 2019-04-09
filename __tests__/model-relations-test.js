@@ -272,6 +272,10 @@ test('It can load belongsTo, hasOne, and hasMany relations for model with custom
     {
       id: uuid(),
       name: 'Gamers'
+    },
+    {
+      id: uuid(),
+      name: 'Eat Veggies'
     }
   ];
 
@@ -287,6 +291,10 @@ test('It can load belongsTo, hasOne, and hasMany relations for model with custom
     {
       name: 'Ben',
       teamId: newTeams[1].id
+    },
+    {
+      name: 'Coco',
+      teamId: null
     }
   ];
 
@@ -313,7 +321,7 @@ test('It can load belongsTo, hasOne, and hasMany relations for model with custom
   let profiles = await Profiles.create(newProfiles);
   let users = await Users.include('team').all();
 
-  expect(users.count()).toBe(3);
+  expect(users.count()).toBe(4);
 
   let nathan = users.find(u => u.getIn(['wrapped', 'name']) === 'Nathan');
   expect(nathan).toBeTruthy();
@@ -327,8 +335,12 @@ test('It can load belongsTo, hasOne, and hasMany relations for model with custom
   expect(ben).toBeTruthy();
   expect(ben.getIn(['wrapped', 'team', 'wrapped', 'name'])).toBe(newTeams[1].name);
 
+  let coco = users.find(u => u.getIn(['wrapped', 'name']) === 'Coco');
+  expect(coco).toBeTruthy();
+  expect(coco.getIn(['wrapped', 'team'])).toBeUndefined();
+
   teams = await Teams.include('users').all();
-  expect(teams.count()).toBe(2);
+  expect(teams.count()).toBe(3);
   expect(
     teams
       .find(t => t.getIn(['wrapped', 'name']) === newTeams[0].name)
@@ -344,9 +356,10 @@ test('It can load belongsTo, hasOne, and hasMany relations for model with custom
 
   teams = await Teams.include('profile').all();
 
-  expect(teams.count()).toBe(2);
+  expect(teams.count()).toBe(3);
   expect(teams.find(t => t.getIn(['wrapped', 'name']) == newTeams[0].name).getIn(['wrapped', 'profile', 'wrapped', 'bio'])).toBe(newProfiles[0].bio);
   expect(teams.find(t => t.getIn(['wrapped', 'name']) == newTeams[1].name).getIn(['wrapped', 'profile', 'wrapped', 'bio'])).toBe(newProfiles[1].bio);
+  expect(teams.find(t => t.getIn(['wrapped', 'name']) == newTeams[2].name).getIn(['wrapped', 'profile'])).toBeUndefined();
 });
 
 test('It can load hasAndBelongsToMany relations', async () => {

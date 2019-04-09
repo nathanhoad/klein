@@ -959,11 +959,11 @@ class Model {
     // Graft the relations onto the matching results
     return results.map(result => {
       relations.forEach(relation => {
+        var row;
         switch (relation.properties.type) {
           case 'belongsTo':
-            result[relation.name] = relation.model._factory(
-              relation.rows.find(r => r.id === result[relation.properties.key])
-            );
+            row = relation.rows.find(r => r.id === result[relation.properties.key]);
+            result[relation.name] = row && relation.model._factory(row);
             break;
 
           case 'hasMany':
@@ -973,9 +973,8 @@ class Model {
             break;
 
           case 'hasOne':
-            result[relation.name] = relation.model._factory(
-              relation.rows.find(r => r[relation.properties.key] === result.id)
-            );
+            row = relation.rows.find(r => r[relation.properties.key] === result.id);
+            result[relation.name] = row && relation.model._factory(row);
             break;
 
           case 'hasAndBelongsToMany':
