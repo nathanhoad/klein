@@ -872,12 +872,13 @@ class Model {
         return this.knex(relation.table, options)
           .select('id')
           .whereIn('id', newRelatedObjectsIds)
+          .then((results) => results.map((result) => result.id))
           .then(existingRelatedIds => {
             relatedObject[relation.key] = model.id;
             // save/update the related object (which will then in turn save any relations on itself)
             return RelatedModel.save(
               relatedObject,
-              Object.assign({}, options, { exists: newRelatedObjectsIds.includes(relatedObject.id) })
+              Object.assign({}, options, { exists: existingRelatedIds.includes(relatedObject.id) })
             );
           })
           .then(savedRelatedObject => {
