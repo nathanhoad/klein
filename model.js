@@ -857,10 +857,10 @@ class Model {
 
     // Get or make a Klein model for the related table
     const RelatedModel = this.klein.model(relation.table);
-    relatedObject = RelatedModel._serialize(relatedObject);
+    relatedObject = relatedObject && RelatedModel._serialize(relatedObject);
 
     // find any objects that have already been persisted
-    let newRelatedObjectsIds = [relatedObject].map(r => r.id).filter(id => id && typeof id !== 'undefined');
+    let newRelatedObjectsIds = [relatedObject].map(r => r && r.id).filter(id => id && typeof id !== 'undefined');
 
     // Unset any objects that have this model as their relation id
     await this.knex(relation.table, options)
@@ -873,12 +873,16 @@ class Model {
       .whereIn('id', newRelatedObjectsIds)
       .then((results) => results.map((result) => result.id));
 
-    relatedObject[relation.key] = model.id;
-    // save/update the related object (which will then in turn save any relations on itself)
-    const savedRelatedObject = await RelatedModel.save(
-      relatedObject,
-      Object.assign({}, options, { exists: existingRelatedIds.includes(relatedObject.id) })
-    );
+    var savedRelatedObject = null
+
+    if (relatedObject) {
+      relatedObject[relation.key] = model.id;
+      // save/update the related object (which will then in turn save any relations on itself)
+      savedRelatedObject = await RelatedModel.save(
+        relatedObject,
+        Object.assign({}, options, { exists: existingRelatedIds.includes(relatedObject.id) })
+      );
+    }
       
     return {
       name: relation.name,
