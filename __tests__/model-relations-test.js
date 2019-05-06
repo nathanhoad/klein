@@ -605,6 +605,11 @@ test('It can save an object that has a hasOne relation on it', async () => {
     bio: 'Working on Design'
   });
 
+  const profileWithId = Immutable.fromJS({
+    id: uuid(),
+    name: 'Working on Art'
+  });
+
   const newUser = {
     name: 'Nathan'
   };
@@ -639,6 +644,19 @@ test('It can save an object that has a hasOne relation on it', async () => {
 
   profile = await Profiles.include('user').find(profile.get('id'));
   expect(profile.get('user')).toBeFalsy();
+
+  user = user.set('profile', profileWithId);
+  user = await Users.save(user);
+
+  expect(user.getIn(['profile', 'id'])).toBe(profileWithId.get('id'));
+
+
+  let existingProfile = await Profiles.create(initialProfile)
+  user = user.set('profile', existingProfile.set('name', 'Working on updates'));
+  user = await Users.save(user)
+
+  expect(user.getIn(['profile', 'id'])).toBe(existingProfile.get('id'));
+  expect(user.getIn(['profile', 'name'])).toBe('Working on updates');
 });
 
 test('It can save an object that has a hasOne relation on it for model with custom instance', async () => {
