@@ -577,7 +577,7 @@ class Model {
     if (this.args.type && typeof this.args.type.instanceOf === 'function') {
       return !!this.args.type.instanceOf(maybeModel);
     } else {
-      return !!maybeModel.toJS;
+      return !!(maybeModel && maybeModel.toJS);
     }
   }
 
@@ -863,31 +863,27 @@ class Model {
     let newRelatedObjectsIds = [relatedObject].map(r => r.id).filter(id => id && typeof id !== 'undefined');
 
     // Unset any objects that have this model as their relation id
-    return this.knex(relation.table, options)
+    await this.knex(relation.table, options)
       .where(relation.key, model.id)
       .whereNotIn('id', newRelatedObjectsIds)
-      .update({ [relation.key]: null })
-      .then(() => {
-        // Find any related objects that are already in the database
-        return this.knex(relation.table, options)
-          .select('id')
-          .whereIn('id', newRelatedObjectsIds)
-          .then((results) => results.map((result) => result.id))
-          .then(existingRelatedIds => {
-            relatedObject[relation.key] = model.id;
-            // save/update the related object (which will then in turn save any relations on itself)
-            return RelatedModel.save(
-              relatedObject,
-              Object.assign({}, options, { exists: existingRelatedIds.includes(relatedObject.id) })
-            );
-          })
-          .then(savedRelatedObject => {
-            return {
-              name: relation.name,
-              value: savedRelatedObject
-            };
-          });
-      });
+      .update({ [relation.key]: null });
+
+    const existingRelatedIds = await this.knex(relation.table, options)
+      .select('id')
+      .whereIn('id', newRelatedObjectsIds)
+      .then((results) => results.map((result) => result.id));
+
+    relatedObject[relation.key] = model.id;
+    // save/update the related object (which will then in turn save any relations on itself)
+    const savedRelatedObject = await RelatedModel.save(
+      relatedObject,
+      Object.assign({}, options, { exists: existingRelatedIds.includes(relatedObject.id) })
+    );
+      
+    return {
+      name: relation.name,
+      value: savedRelatedObject
+    };
   }
 
   /**
