@@ -657,6 +657,11 @@ test('It can save an object that has a hasOne relation on it', async () => {
 
   expect(user.getIn(['profile', 'id'])).toBe(existingProfile.get('id'));
   expect(user.getIn(['profile', 'bio'])).toBe('Working on updates');
+
+  user = user.set('profile', null);
+  user = await Users.save(user);
+
+  expect(user.get('profile')).toBeNull();
 });
 
 test('It can save an object that has a hasOne relation on it for model with custom instance', async () => {
