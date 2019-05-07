@@ -350,8 +350,9 @@ class Model {
    * Include related models
    */
   include() {
-    this.args._includedRelations = Array.from(arguments);
-    return this._chain(this.query().clone());
+    return this._chain(this.query().clone(), { 
+      _includedRelations: Array.from(arguments) 
+    });
   }
 
   /**
@@ -487,8 +488,8 @@ class Model {
    * @param {Object} query 
    * @returns {Model}
    */
-  _chain(query) {
-    const args = Object.assign({}, this.args, {
+  _chain(query, newArgs) {
+    const args = Object.assign({}, this.args, newArgs || {}, {
       defaultScope: query
     });
 
