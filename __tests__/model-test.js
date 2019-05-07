@@ -271,6 +271,39 @@ describe('Instances', () => {
     expect(list.getIn(['items', 0, 'task'])).toBe(newList.items[0].task);
     expect(list.get('another')).toBeUndefined();
   });
+
+  test("It can create/save an instance without setting timestamps to current time", async () => {
+    const Lists = Klein.model('lists');
+
+    process.env.APP_ROOT = '/tmp/klein/save-touch-timestamps';
+    FS.removeSync(process.env.APP_ROOT);
+
+    const newList = {
+      name: 'Todo',
+      tasks: ['first', 'second', 'third'],
+      createdAt: new Date(2019, 3, 10)
+    }
+
+    await Helpers.setupDatabase([['list', 'name:string', 'tasks:jsonb']], { knex: Klein.knex });
+
+    let list = await Lists.create(newList, { touch: false });
+    list = await Lists.find(list.get('id'));
+
+    expect(list.get('createdAt')).toBeTruthy();
+    expect(list.get('createdAt').valueOf()).toBe(newList.createdAt.valueOf());
+    expect(list.get('updatedAt')).toBeFalsy();
+
+    list = await Lists.save(list, { touch: newList.createdAt });
+    list = await Lists.find(list.get('id'));
+
+    expect(list.get('updatedAt').valueOf()).toBe(newList.createdAt.valueOf());
+
+    let now = new Date()
+    list = await Lists.save(list, { touch: true })
+    list = await Lists.find(list.get('id'))
+
+    expect(list.get('updatedAt').valueOf()).toBeGreaterThanOrEqual(now.valueOf());
+  })
 });
 
 describe('Collections', () => {
