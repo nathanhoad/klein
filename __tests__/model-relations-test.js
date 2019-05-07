@@ -119,6 +119,11 @@ test('It can load belongsTo, hasOne, and hasMany relations', async () => {
   expect(teams.count()).toBe(2);
   expect(teams.find(t => t.get('name') == newTeams[0].name).getIn(['profile', 'bio'])).toBe(newProfiles[0].bio);
   expect(teams.find(t => t.get('name') == newTeams[1].name).getIn(['profile', 'bio'])).toBe(newProfiles[1].bio);
+
+  teams = await Teams.where({ name: newTeams[0].name }).all();
+  expect(teams.count()).toBe(1);
+  expect(teams.first().get('users')).toBeUndefined();
+  expect(teams.first().get('profile')).toBeUndefined();
 });
 
 test('It can load belongsTo, hasOne, and hasMany relations with different keys', async () => {
