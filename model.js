@@ -761,7 +761,7 @@ class Model {
     var foreignValue;
 
     if (relatedObject) {
-      foreignValue = await RelatedModel.save(relatedObject);
+      foreignValue = await RelatedModel.save(relatedObject, options);
     } else {
       foreignValue = null;
     }
