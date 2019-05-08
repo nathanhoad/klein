@@ -637,6 +637,7 @@ test('It can save an object that has a hasOne relation on it', async () => {
     .first();
   expect(user.getIn(['profile', 'id'])).toBe(profile.get('id'));
   expect(profile.getIn(['user', 'id'])).toBe(user.get('id'));
+  expect(profile.get('createdAt')).toEqual(user.get('updatedAt'));
 
   user = user.set('profile', replacementProfile);
   user = await Users.save(user);
@@ -662,6 +663,15 @@ test('It can save an object that has a hasOne relation on it', async () => {
 
   expect(user.getIn(['profile', 'id'])).toBe(existingProfile.get('id'));
   expect(user.getIn(['profile', 'bio'])).toBe('Working on updates');
+
+  let previousUser = user;
+  user = await Users.save(user, { touch: false });
+  expect(user.getIn(['profile', 'updatedAt'])).toBeTruthy();
+  expect(user.getIn(['profile', 'updatedAt'])).toEqual(previousUser.getIn(['profile', 'updatedAt']));
+
+  const testDate = new Date(2019, 3, 10);
+  user = await Users.save(user, { touch: testDate });
+  expect(user.getIn(['profile', 'updatedAt'])).toEqual(testDate);
 
   user = user.set('profile', null);
   user = await Users.save(user);
@@ -817,13 +827,25 @@ test('It can save an object that has hasAndBelongsToMany relations on it', async
     .find(p => p.get('name') === newProjects.first().get('name'));
 
   expect(typeof project.get('id') !== 'undefined').toBeTruthy();
+  expect(project.get('updatedAt')).toEqual(users.first().get('updatedAt'));
 
-  // Make sure subsequent saves don't add duplicates
-  user = await Users.save(users.first());
+  // Make sure subsequent saves don't add duplicates and respects touch option
+  const testDate = new Date(2019, 3, 10);
+  user = await Users.save(users.first(), { touch: testDate });
   expect(user.get('projects').count()).toBe(3);
 
   let projectsUsers = await ProjectsUsers.all();
   expect(projectsUsers.count()).toBe(3);
+
+  project = await Projects.find(project.get('id'));
+
+  expect(project.get('updatedAt')).toEqual(testDate);
+
+  let previousProject = project;
+  user = await Users.save(user, { touch: false });
+  project = await Projects.find(project.get('id'));
+
+  expect(project.get('updatedAt')).toEqual(previousProject.get('updatedAt'));
 });
 
 test('It can save an object that has hasAndBelongsToMany relations on it for model with custom instance', async () => {
@@ -973,6 +995,7 @@ test('It can save an object that has hasMany relations on it', async () => {
   user = await Users.save(user);
 
   expect(user.get('projects').filter((project) => project.get('id')).count()).toBe(2);
+  expect(user.get('projects').first().get('updatedAt')).toEqual(user.get('updatedAt'));
 
   // Add the third, already saved project
   user = user.set('projects', user.get('projects').push(project));
@@ -997,9 +1020,21 @@ test('It can save an object that has hasMany relations on it', async () => {
 
   expect(typeof project.get('id')).not.toBe('undefined');
 
+  const testDate = new Date(2019, 3, 10);
+  user = await Users.save(users.first(), { touch: testDate });
+
+  project = await Projects.find(project.get('id'));
+
+  expect(project.get('updatedAt')).toEqual(testDate);
+
   project = await Projects.find(project.get('id'));
   user = await Users.first();
   expect(project.get('userId')).toBe(user.get('id'));
+
+  let previousProject = project;
+  user = await Users.save(user, { touch: false });
+  project = await Projects.find(project.get('id'));
+  expect(project.get('updatedAt')).toEqual(previousProject.get('updatedAt'));
 });
 
 test('It can save an object that has hasMany relations on it and one of them also has a hasMany relation on it', async () => {
@@ -1204,6 +1239,7 @@ test('It can save an object that has a belongsTo relations on it', async () => {
     .first();
   expect(project.getIn(['user', 'id'])).toBe(initialUser.get('id'));
   expect(initialUser.getIn(['projects', 0, 'id'])).toBe(project.get('id'));
+  expect(initialUser.get('createdAt')).toEqual(project.get('updatedAt'));
 
   project = project.set('user', replacementUser);
   project = await Projects.save(project);
@@ -1216,6 +1252,16 @@ test('It can save an object that has a belongsTo relations on it', async () => {
   // Check that the initialUser projects is now empty
   initialUser = await Users.include('projects').find(initialUser.get('id'));
   expect(initialUser.get('projects').count()).toBe(0);
+
+  const testDate = new Date(2019, 3, 10);
+  project = await Projects.save(project, { touch: testDate });
+  replacementUser = await Users.find(replacementUser.get('id'));
+  expect(replacementUser.get('updatedAt')).toEqual(testDate);
+
+  let previousUser = replacementUser;
+  project = await Projects.save(project, { touch: false });
+  replacementUser = await Users.find(previousUser.get('id'));
+  expect(replacementUser.get('updatedAt')).toEqual(previousUser.get('updatedAt'));
 
   project = project.set('user', null);
   project = await Projects.save(project);
