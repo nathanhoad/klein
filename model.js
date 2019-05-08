@@ -207,9 +207,15 @@ class Model {
       }
     });
 
+    // Determine the current point in time for all follow updates
+    // interpret anything that renders to a number (like Date, time-sugar) as a timestamp
+    const touch = typeof options.touch !== 'undefined' && options.touch.valueOf();
+    options.touch = typeof touch === 'number' ? new Date(touch) : 
+      touch === false ? touch : new Date();
+
     // Convert everything to something we can put into the database
     properties = this._prepareFields(properties);
-    this._updateTimestamp(properties, 'updatedAt', options);
+    this._updateTimestamp(properties, 'updatedAt', options.touch);
 
     // Check if the record has already been persisted
     const exists =
@@ -242,7 +248,7 @@ class Model {
         .where({ id: properties.id })
         .update(properties, '*');
     } else {
-      this._updateTimestamp(properties, 'createdAt', options);
+      this._updateTimestamp(properties, 'createdAt', options.touch);
       results = await this.knex(this.tableName, options).insert(properties, '*');
     }
 
@@ -831,8 +837,8 @@ class Model {
             [relation.key]: relatedId,
             [relation.sourceKey]: model.id
           };
-          this._updateTimestamp(newJoinRow, 'updatedAt', options);
-          this._updateTimestamp(newJoinRow, 'createdAt', options);
+          this._updateTimestamp(newJoinRow, 'updatedAt', options.touch);
+          this._updateTimestamp(newJoinRow, 'createdAt', options.touch);
           await this.knex(relation.throughTable, options).insert(newJoinRow, 'id');
         }
 
@@ -1001,13 +1007,8 @@ class Model {
    * @param {Object} properties 
    * @param {String} field 
    */
-  _updateTimestamp(properties, field, options) {
-    if (typeof options === 'undefined') options = {};
-
-    if (this.timestampFields[field] && options.touch !== false) {
-      // interpret anything that renders to a number (like Date, time-sugar) as a timestamp
-      let touch = typeof options.touch !== 'undefined' && options.touch.valueOf();
-      let date = typeof touch === 'number' ? new Date(touch) : new Date();
+  _updateTimestamp(properties, field, date) {
+    if (this.timestampFields[field] && date) {
       properties[this.timestampFields[field]] = date;
     }
   }
