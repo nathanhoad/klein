@@ -282,7 +282,12 @@ describe('Instances', () => {
       name: 'Todo',
       tasks: ['first', 'second', 'third'],
       createdAt: new Date(2019, 3, 10)
-    }
+    };
+
+    const otherList = {
+      name: 'Other todos',
+      tasks: ['first', 'second', 'third']
+    };
 
     await Helpers.setupDatabase([['list', 'name:string', 'tasks:jsonb']], { knex: Klein.knex });
 
@@ -298,11 +303,21 @@ describe('Instances', () => {
 
     expect(list.get('updatedAt').valueOf()).toBe(newList.createdAt.valueOf());
 
-    let now = new Date()
-    list = await Lists.save(list, { touch: true })
-    list = await Lists.find(list.get('id'))
+    let now = new Date();
+    list = await Lists.save(list, { touch: true });
+    list = await Lists.find(list.get('id'));
 
     expect(list.get('updatedAt').valueOf()).toBeGreaterThanOrEqual(now.valueOf());
+
+    list = await Lists.create(otherList, { touch: false })
+
+    expect(list.get('createdAt')).toBeFalsy();
+
+    list = await Lists.save(list);
+    list = await Lists.find(list.get('id'));
+
+    expect(list.get('createdAt')).toBeFalsy();
+    expect(list.get('updatedAt')).toBeTruthy();
   })
 });
 
