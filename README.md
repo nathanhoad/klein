@@ -243,6 +243,14 @@ user = user.set('firstName', 'Nathan');
 Users.save(user).then(user => {
   user.get('updatedAt'); // Just then
 });
+
+Users.save(user, { touch: false }).then(user => {
+  user.get('updatedAt'); // not changed with touch: false
+})
+
+Users.save(user, { touch: new Date(2019, 2, 13) }).then(user => {
+  user.get('updatedAt'); // set to date specified in touch option
+}) 
 ```
 
 Saving a model that has `relations` attached will also attempt to save the attached related rows.
