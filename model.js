@@ -209,7 +209,7 @@ class Model {
 
     // Determine the current point in time for all follow updates
     // interpret anything that renders to a number (like Date, time-sugar) as a timestamp
-    const touch = typeof options.touch !== 'undefined' && options.touch.valueOf();
+    const touch = typeof options.touch !== 'undefined' ? options.touch.valueOf() : options.touch;
     options.touch = typeof touch === 'number' ? new Date(touch) : 
       touch === false ? touch : new Date();
 
