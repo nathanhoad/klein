@@ -637,7 +637,7 @@ test('It can save an object that has a hasOne relation on it', async () => {
     .first();
   expect(user.getIn(['profile', 'id'])).toBe(profile.get('id'));
   expect(profile.getIn(['user', 'id'])).toBe(user.get('id'));
-  expect(profile.get('updatedAt')).toEqual(user.get('updatedAt'));
+  expect(profile.get('createdAt')).toEqual(user.get('updatedAt'));
 
   user = user.set('profile', replacementProfile);
   user = await Users.save(user);
@@ -663,6 +663,15 @@ test('It can save an object that has a hasOne relation on it', async () => {
 
   expect(user.getIn(['profile', 'id'])).toBe(existingProfile.get('id'));
   expect(user.getIn(['profile', 'bio'])).toBe('Working on updates');
+
+  let previousUser = user;
+  user = await Users.save(user, { touch: false });
+  expect(user.getIn(['profile', 'updatedAt'])).toBeTruthy();
+  expect(user.getIn(['profile', 'updatedAt'])).toEqual(previousUser.getIn(['profile', 'updatedAt']));
+
+  const testDate = new Date(2019, 3, 10);
+  user = await Users.save(user, { touch: testDate });
+  expect(user.getIn(['profile', 'updatedAt'])).toEqual(testDate);
 
   user = user.set('profile', null);
   user = await Users.save(user);
