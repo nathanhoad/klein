@@ -637,6 +637,7 @@ test('It can save an object that has a hasOne relation on it', async () => {
     .first();
   expect(user.getIn(['profile', 'id'])).toBe(profile.get('id'));
   expect(profile.getIn(['user', 'id'])).toBe(user.get('id'));
+  expect(profile.get('updatedAt')).toEqual(user.get('updatedAt'));
 
   user = user.set('profile', replacementProfile);
   user = await Users.save(user);
