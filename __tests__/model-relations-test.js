@@ -1,6 +1,7 @@
 const Immutable = require('immutable');
 const FS = require('fs-extra');
 const uuid = require('uuid/v4');
+const Sinon = require('sinon');
 
 const Helpers = require('./__helpers__');
 
@@ -1359,6 +1360,69 @@ test('It can save an object that has a belongsTo relations on it for model with 
     .first();
   expect(project.getIn(['wrapped', 'user'])).toBe(null);
   expect(replacementUser.getIn(['wrapped', 'projects']).count()).toBe(0);
+});
+
+test('It can save an object and touch timestamps of existing belongsTo relations', async () => {
+  const Users = Klein.model('users', {
+    relations: {
+      projects: { hasMany: 'projects' }
+    }
+  });
+  const Projects = Klein.model('projects', {
+    relations: {
+      user: { belongsTo: 'user', touch: true }
+    }
+  });
+
+  process.env.APP_ROOT = '/tmp/klein/saving-belongs-to';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const newProject = Immutable.fromJS({
+    id: uuid(),
+    name: 'Awesome Game'
+  });
+
+  let initialUser = Immutable.fromJS({
+    name: 'Nathan'
+  });
+
+  let replacementUser = Immutable.fromJS({
+    name: 'Lilly'
+  });
+
+  await Helpers.setupDatabase([['users', 'name:string'], ['projects', 'name:string', 'userId:uuid']], {
+    knex: Klein.knex
+  });
+
+  let user = await Users.create(initialUser.set('projects', Immutable.List([newProject])));
+  
+  let project = await Projects.where({ name: newProject.get('name') }).first();
+  expect(project).toBeTruthy();
+  
+  project = await Projects.save(project);
+
+  let previousUser = user;
+  user = await Users.find(user.get('id'));
+
+  expect(user.get('updatedAt')).toEqual(project.get('updatedAt'));
+  expect(user.get('updatedAt').valueOf()).toBeGreaterThan(previousUser.get('updatedAt').valueOf());
+
+  project = await Projects.save(project.set('user', null));
+  project = await Projects.find(project.get('id'));
+  project = await Projects.save(project);
+  
+  previousUser = user;
+  user = await Users.find(user.get('id'));
+
+  expect(user.get('updatedAt')).toEqual(previousUser.get('updatedAt'));
+
+  project = await Projects.save(project.set('user', user));
+  user = await Users.include('projects').find(user.get('id'))
+  
+  Sinon.spy(Users, 'save');
+  user = await Users.save(user);
+  expect(Users.save.calledOnce).toBe(true);
+  Users.save.restore();
 });
 
 test('It can destroy dependent objects when destroying the parent', async () => {

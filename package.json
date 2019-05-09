@@ -52,6 +52,7 @@
     "yeoman-test": "^1.7.2"
   },
   "devDependencies": {
-    "jest": "^21.2.1"
+    "jest": "^21.2.1",
+    "sinon": "^7.3.2"
   }
 }
