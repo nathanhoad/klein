@@ -46,24 +46,28 @@ class Model {
         relation.sourceKey = relation.primaryKey || `${Inflect.singularize(this.tableName)}Id`;
         relation.key = relation.foreignKey || `${Inflect.singularize(relationName)}Id`;
         relation.dependent = false;
+        relation.touch = false;
       } else if (relation.belongsTo) {
         relation.many = false;
         relation.type = 'belongsTo';
         relation.table = relation.table || Inflect.pluralize(relation.belongsTo);
         relation.key = relation.foreignKey || `${Inflect.singularize(relationName)}Id`;
         relation.dependent = false;
+        relation.touch = relation.touch === true;
       } else if (relation.hasMany) {
         relation.many = true;
         relation.type = 'hasMany';
         relation.table = relation.table || Inflect.pluralize(relation.hasMany);
         relation.key = relation.foreignKey || `${Inflect.singularize(this.tableName)}Id`;
         relation.dependent = relation.dependent === true;
+        relation.touch = false;
       } else if (relation.hasOne) {
         relation.many = false;
         relation.type = 'hasOne';
         relation.table = relation.table || Inflect.pluralize(relation.hasOne);
         relation.key = relation.foreignKey || `${Inflect.singularize(this.tableName)}Id`;
         relation.dependent = relation.dependent === true;
+        relation.touch = false;
       }
 
       this._availableRelations[relationName] = relation;
@@ -199,12 +203,12 @@ class Model {
     let properties = Object.assign({}, this._serialize(model));
 
     // Detach relations because they can't be saved against this record
+    let includedRelations = Object.keys(properties).filter((propertyName) => Object.keys(this._availableRelations).includes(propertyName));
+    let excludedRelations = Object.keys(this._availableRelations).filter((propertyName) => !includedRelations.includes(propertyName));
     let relations = {};
-    Object.keys(properties).forEach(propertyName => {
-      if (Object.keys(this._availableRelations).includes(propertyName)) {
-        relations[propertyName] = properties[propertyName];
-        delete properties[propertyName];
-      }
+    includedRelations.forEach(propertyName => {
+      relations[propertyName] = properties[propertyName];
+      delete properties[propertyName];
     });
 
     // Determine the current point in time for all follow updates
@@ -259,6 +263,9 @@ class Model {
       object[propertyName] = relations[propertyName];
     });
     object = await this._saveRelations(object, options);
+
+    // touch any relations not included in the save
+    await this._touchRelations(object, excludedRelations, options);
 
     this._hook('afterSave', object, exists);
     if (!exists) {
@@ -895,6 +902,30 @@ class Model {
       name: relation.name,
       value: savedRelatedObject
     };
+  }
+
+  async _touchRelations(model, relationNames, options) {
+    if (!options || options.touch === false) return null;
+
+    const relations = relationNames.map((propertyName) => this._availableRelations[propertyName]);
+
+    return Promise.all(relations.map(async (relation) => {
+      if (typeof relation === 'undefined') throw new Error(`Cannot touch '${propertyName}': is not a defined relation`)
+      if (!relation.touch) return null;
+
+      if (relation.type === 'belongsTo') {
+        // eg.
+        // User belongs to Department
+        // Project belongs to User (eg. created_by_user_id)
+        let relationId = model[relation.key];
+        let RelatedModel = this.klein.model(relation.table);
+
+        let relatedRecord = await RelatedModel.find(relationId);
+        await RelatedModel.save(relatedRecord, Object.assign({}, options, { exists: true }));
+      } else {
+        return null;
+      }
+    }))
   }
 
   /**
