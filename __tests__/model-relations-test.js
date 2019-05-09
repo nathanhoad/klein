@@ -1361,6 +1361,51 @@ test('It can save an object that has a belongsTo relations on it for model with 
   expect(replacementUser.getIn(['wrapped', 'projects']).count()).toBe(0);
 });
 
+test('It can save an object and touch timestamps of existing belongsTo relations', async () => {
+  const Users = Klein.model('users', {
+    relations: {
+      projects: { hasMany: 'projects' }
+    }
+  });
+  const Projects = Klein.model('projects', {
+    relations: {
+      user: { belongsTo: 'user', touch: true }
+    }
+  });
+
+  process.env.APP_ROOT = '/tmp/klein/saving-belongs-to';
+  FS.removeSync(process.env.APP_ROOT);
+
+  const newProject = Immutable.fromJS({
+    id: uuid(),
+    name: 'Awesome Game'
+  });
+
+  let initialUser = Immutable.fromJS({
+    name: 'Nathan'
+  });
+
+  let replacementUser = Immutable.fromJS({
+    name: 'Lilly'
+  });
+
+  await Helpers.setupDatabase([['users', 'name:string'], ['projects', 'name:string', 'userId:uuid']], {
+    knex: Klein.knex
+  });
+
+  let user = await Users.create(initialUser.set('projects', Immutable.List([newProject])));
+  
+  let project = await Projects.where({ name: newProject.get('name') }).first();
+  expect(project).toBeTruthy();
+  
+  project = await Projects.save(project);
+
+  let previousUser = user;
+  user = await Users.find(user.get('id'));
+
+  expect(user.get('updatedAt')).toEqual(project.get('updatedAt'));
+});
+
 test('It can destroy dependent objects when destroying the parent', async () => {
   const Users = Klein.model('users', {
     relations: {
