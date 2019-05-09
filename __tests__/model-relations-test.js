@@ -1,6 +1,7 @@
 const Immutable = require('immutable');
 const FS = require('fs-extra');
 const uuid = require('uuid/v4');
+const Sinon = require('sinon');
 
 const Helpers = require('./__helpers__');
 
@@ -1415,6 +1416,13 @@ test('It can save an object and touch timestamps of existing belongsTo relations
 
   expect(user.get('updatedAt')).toEqual(previousUser.get('updatedAt'));
 
+  project = await Projects.save(project.set('user', user));
+  user = await Users.include('projects').find(user.get('id'))
+  
+  Sinon.spy(Users, 'save');
+  user = await Users.save(user);
+  expect(Users.save.calledOnce).toBe(true);
+  Users.save.restore();
 });
 
 test('It can destroy dependent objects when destroying the parent', async () => {
