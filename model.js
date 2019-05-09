@@ -920,7 +920,8 @@ class Model {
         let relationId = model[relation.key];
         let RelatedModel = this.klein.model(relation.table);
 
-        let relatedRecord = await RelatedModel.find(relationId);
+        let relatedRecord = relationId && await RelatedModel.find(relationId);
+        if (!relatedRecord) return null;
         await RelatedModel.save(relatedRecord, Object.assign({}, options, { exists: true }));
       } else {
         return null;

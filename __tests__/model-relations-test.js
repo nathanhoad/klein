@@ -1404,6 +1404,17 @@ test('It can save an object and touch timestamps of existing belongsTo relations
   user = await Users.find(user.get('id'));
 
   expect(user.get('updatedAt')).toEqual(project.get('updatedAt'));
+  expect(user.get('updatedAt').valueOf()).toBeGreaterThan(previousUser.get('updatedAt').valueOf());
+
+  project = await Projects.save(project.set('user', null));
+  project = await Projects.find(project.get('id'));
+  project = await Projects.save(project);
+  
+  previousUser = user;
+  user = await Users.find(user.get('id'));
+
+  expect(user.get('updatedAt')).toEqual(previousUser.get('updatedAt'));
+
 });
 
 test('It can destroy dependent objects when destroying the parent', async () => {
