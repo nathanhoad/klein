@@ -217,6 +217,9 @@ class Model {
     options.touch = typeof touch === 'number' ? new Date(touch) : 
       touch === false ? touch : new Date();
 
+    const savedModels = options._savedModels || Immutable.Set()
+    options._savedModels = savedModels.add(Immutable.Map({ tableName: this.tableName, id: properties.id }))
+
     // Convert everything to something we can put into the database
     properties = this._prepareFields(properties);
     this._updateTimestamp(properties, 'updatedAt', options.touch);
@@ -919,6 +922,11 @@ class Model {
         // Project belongs to User (eg. created_by_user_id)
         let relationId = model[relation.key];
         let RelatedModel = this.klein.model(relation.table);
+        let wasSaved = options._savedModels.includes(
+          Immutable.Map({ tableName: relation.table, id: relationId })
+        )
+
+        if (wasSaved) return null;
 
         let relatedRecord = relationId && await RelatedModel.find(relationId);
         if (!relatedRecord) return null;
