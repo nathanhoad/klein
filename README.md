@@ -39,7 +39,7 @@ You can configure where Klein will put the models and migrations in your `packag
 ```javascript
 {
     "klein": {
-        "migrationsPath": "migrations"
+        "migrationsPath": "migrations",
         "modelsPath": "app/server/models"
     }
 }
@@ -50,12 +50,14 @@ You can configure where Klein will put the models and migrations in your `packag
 The easiest init is:
 
 ```javascript
-// Assumes that process.env.DATABASE_URL is set and automatically connects
-// to the database
+// Assumes that process.env.DATABASE_URL or process.env.TEST_DATABASE_URL is set 
+// and automatically connects to the database
 const Klein = require('klein/auto');
 ```
 
-But if you need to specify a database URL:
+When using `auto` make sure you have the environment variable `DATABASE_URL` (or, when testing, `TEST_DATABASE_URL`).
+
+If you want to manually specify a database URL:
 
 ```javascript
 const Klein = require('klein').connect(process.env.DATABASE_URL);
@@ -100,7 +102,7 @@ const Users = Klein.model('users', {
         }
     },
     relations: {
-        projects: { hasAndBelongsToMany: 'projects' }
+        projects: { hasAndBelongsToMany: 'projects' },
         department: { belongsTo: 'department' }, // assumes department_id
         shirts: { has_many: 'shirts', dependent: true } // deleting this user will delete all of their shirts
     },
@@ -303,7 +305,7 @@ Define `relations` on the collection:
 ```javascript
 const Users = Klein.model('users', {
     relations: {
-        projects: { hasAndBelongsToMany: 'projects' }
+        projects: { hasAndBelongsToMany: 'projects' },
         department: { belongsTo: 'department' }, // assumes departmentId unless otherwise specified
         shirts: { hasMany: 'shirts', dependent: true } // deleting this user will delete all of their shirts
     }
@@ -342,7 +344,7 @@ You can specify the key fields and table if needed:
 ```javascript
 const Users = Klein.model('users', {
     relations: {
-        projects: { hasAndBelongsToMany: 'projects', through: 'project_people', primaryKey: 'userId', foreignKey: 'projectId'  }
+        projects: { hasAndBelongsToMany: 'projects', through: 'project_people', primaryKey: 'userId', foreignKey: 'projectId'  },
         department: { belongsTo: 'department', foreignKey: 'departmentId', table: 'department' },
         shirts: { has_many: 'shirts', dependent: true, foreignKey: 'userId' }
     }
