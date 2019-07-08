@@ -86,6 +86,13 @@ module.exports = class extends Generator {
     });
     this._prettify(migrationFilename);
 
+    // Don't include the timestampes option if they keys are the same as the values
+    if (typeof config.timestamps === "object"
+      && config.timestamps.createdAt && config.timestamps.createdAt === "createdAt"
+      && config.timestamps.updatedAt && config.timestamps.updatedAt === "updatedAt") {
+      config.timestamps = false;
+    }
+
     const modelFilename = this.destinationPath(`${config.modelsPath}/${this.options.filename}`);
     this.fs.copyTpl(this.templatePath('model.js'), modelFilename, {
       tableName: this.options.tableName,
