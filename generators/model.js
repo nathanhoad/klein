@@ -102,7 +102,7 @@ module.exports = class extends Generator {
         printWidth: 120,
         tabWidth: 2,
         singleQuote: true,
-        parser: 'babylon'
+        parser: 'babel'
       })
     );
   }

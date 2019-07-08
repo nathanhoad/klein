@@ -1,4 +1,4 @@
-require('dotenv').load({ silent: true });
+require('dotenv').config();
 
 const Knex = require('knex');
 const { getConfig } = require('./util');

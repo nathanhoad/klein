@@ -1,4 +1,4 @@
-require('dotenv').load({ silent: true });
+require('dotenv').config({});
 
 const knex = require('knex');
 const uuid = require('uuid/v4');

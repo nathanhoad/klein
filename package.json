@@ -36,23 +36,23 @@
     "url": "https://github.com/nathanhoad/klein/issues"
   },
   "dependencies": {
-    "chalk": "^2.2.0",
-    "dotenv": "^4.0.0",
-    "fs-extra": "^4.0.2",
+    "chalk": "^2.4.2",
+    "dotenv": "^8.0.0",
+    "fs-extra": "^8.1.0",
     "guess-root-path": "^1.0.0",
     "i": "^0.3.6",
     "immutable": "^3.8.2",
-    "knex": "^0.14.6",
+    "knex": "^0.18.3",
     "lodash.isplainobject": "^4.0.6",
-    "pg": "^7.3.0",
+    "pg": "^7.11.0",
     "prettier": "^1.7.4",
-    "uuid": "^3.1.0",
+    "uuid": "^3.3.2",
     "yeoman-environment": "^2.2.0",
     "yeoman-generator": "^2.0.5",
     "yeoman-test": "^1.7.2"
   },
   "devDependencies": {
-    "jest": "^21.2.1",
+    "jest": "^24.8.0",
     "sinon": "^7.3.2"
   }
 }
