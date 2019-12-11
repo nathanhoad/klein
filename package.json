@@ -42,7 +42,7 @@
     "guess-root-path": "^1.0.0",
     "i": "^0.3.6",
     "immutable": "^3.8.2",
-    "knex": "^0.18.3",
+    "knex": "^0.20.4",
     "lodash.isplainobject": "^4.0.6",
     "pg": "^7.11.0",
     "prettier": "^1.7.4",
